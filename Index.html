@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Schedule Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 60px 20px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #5a6fd8;
+            background: #f0f2ff;
+            transform: translateY(-2px);
+        }
+
+        .drop-zone.dragover {
+            border-color: #4CAF50;
+            background: #f0fff0;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .results-section {
+            padding: 40px;
+            display: none;
+        }
+
+        .stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .common-free-section {
+            background: linear-gradient(135deg, #e8f5e8, #f0fff0);
+            border: 2px solid #4CAF50;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .common-free-title {
+            font-size: 1.5em;
+            color: #2e7d32;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .no-common-time {
+            text-align: center;
+            color: #f44336;
+            font-size: 1.1em;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 10px;
+            border: 2px solid #ffcdd2;
+        }
+
+        .common-slots-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .day-common-slots {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #c8e6c9;
+        }
+
+        .day-common-title {
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .common-time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .common-time-slot {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .no-slots-day {
+            color: #999;
+            font-style: italic;
+        }
+
+        .classroom-occupancy-section {
+            background: linear-gradient(135deg, #fff3e0, #fafafa);
+            border: 2px solid #ff9800;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .classroom-title {
+            font-size: 1.5em;
+            color: #e65100;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .classroom-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .classroom-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #ffcc02;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .classroom-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 152, 0, 0.15);
+        }
+
+        .classroom-header {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .classroom-name {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .occupancy-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .occupancy-high {
+            background: #d32f2f !important;
+        }
+
+        .occupancy-medium {
+            background: #f57c00 !important;
+        }
+
+        .occupancy-low {
+            background: #388e3c !important;
+        }
+
+        .classroom-details {
+            display: none;
+            padding: 20px;
+        }
+
+        .classroom-details.expanded {
+            display: block;
+        }
+
+        .occupancy-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .occupancy-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .occupancy-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #ff9800;
+        }
+
+        .stat-label-small {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .daily-schedule {
+            margin-top: 15px;
+        }
+
+        .day-schedule {
+            margin-bottom: 15px;
+        }
+
+        .day-name {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        .time-blocks {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 2px;
+            height: 25px;
+        }
+
+        .time-block {
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .time-block.occupied {
+            background: #ff9800;
+        }
+
+        .time-block.free {
+            background: #e0e0e0;
+        }
+
+        .time-labels {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 2px;
+            margin-top: 5px;
+            font-size: 0.7em;
+            color: #666;
+        }
+
+        .time-label {
+            text-align: center;
+        }
+
+        .teacher-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .teacher-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .teacher-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            cursor: pointer;
+        }
+
+        .teacher-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .class-count {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .schedule-content {
+            display: none;
+            padding: 20px;
+        }
+
+        .schedule-content.expanded {
+            display: block;
+        }
+
+        .day-section {
+            margin-bottom: 20px;
+        }
+
+        .day-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .time-slot {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .busy-slot {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .free-slot {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #f44336;
+        }
+
+        /* Rich tooltip styling */
+        .has-tooltip { position: relative; }
+        .has-tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 130%;
+            background: #2c3e50;
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            white-space: pre-line;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            font-size: 0.85em;
+            max-width: 260px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .has-tooltip:hover::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 120%;
+            border: 6px solid transparent;
+            border-top-color: #2c3e50;
+            z-index: 1001;
+            pointer-events: none;
+        }
+        .app-footer {
+            text-align: center;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 16px 0;
+            margin-top: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Teacher Schedule Analyzer</h1>
+            <p>Upload your course schedule CSV to find when teachers are available and analyze classroom occupancy</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="drop-zone" id="dropZone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop your CSV file here or click to browse</div>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                    Choose File
+                </button>
+                <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" multiple />
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="stats" id="statsSection"></div>
+            <div class="common-free-section" id="commonFreeSection"></div>
+            <div class="classroom-occupancy-section" id="classroomSection"></div>
+            <div id="teacherSchedules"></div>
+        </div>
+
+        <div class="loading" id="loadingSection" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing your schedule data...</p>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const resultsSection = document.getElementById('resultsSection');
+        const loadingSection = document.getElementById('loadingSection');
+        const teacherSchedules = document.getElementById('teacherSchedules');
+        const statsSection = document.getElementById('statsSection');
+        const commonFreeSection = document.getElementById('commonFreeSection');
+        const classroomSection = document.getElementById('classroomSection');
+
+        // Working hours and days configuration
+        const WORK_HOURS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+        const WORK_DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+        
+        // Full occupancy is 8am to 4pm (8 hours = 100%)
+        const FULL_OCCUPANCY_HOURS = 8; // 08:00 to 16:00
+
+        function extractClassId(courseName) {
+            if (!courseName) return '';
+            const m = String(courseName).match(/^[A-Z]{3,5}\d{3,4}/i);
+            return m ? m[0].toUpperCase() : String(courseName).split(' ')[0];
+        }
+
+        // File drop handling
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files);
+            }
+        });
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files);
+            }
+        });
+
+        function handleFile(files) {
+            if (files.length === 0) {
+                showError('Please select at least one CSV file.');
+                return;
+            }
+
+            showLoading();
+            
+            const allRows = [];
+            let processed = 0;
+
+            Array.from(files).forEach(file => {
+                const lower = file.name.toLowerCase();
+                const isCsv = lower.endsWith('.csv');
+                const isXlsx = lower.endsWith('.xlsx') || lower.endsWith('.xls');
+
+                const pushNormalized = (rawRow) => {
+                    if (!rawRow) return;
+                    const normalized = {};
+                    Object.keys(rawRow).forEach(k => {
+                        const key = (k || '').trim();
+                        const val = rawRow[k];
+                        normalized[key] = typeof val === 'string' ? val.trim() : val;
+                    });
+                    if (normalized['Course Name'] && normalized['Section No']) {
+                        allRows.push(normalized);
+                    }
+                };
+
+                if (isCsv) {
+                    Papa.parse(file, {
+                        header: true,
+                        skipEmptyLines: true,
+                        dynamicTyping: false,
+                        complete: function(results) {
+                            if (Array.isArray(results.data)) {
+                                results.data.forEach(pushNormalized);
+                            }
+                            processed++;
+                            if (processed === files.length) {
+                                try {
+                                    processScheduleData(allRows);
+                                } catch (error) {
+                                    showError('Error processing the data: ' + error.message);
+                                    hideLoading();
+                                }
+                            }
+                        },
+                        error: function(error) {
+                            processed++;
+                            if (processed === files.length) {
+                                showError('Error reading one or more files: ' + error.message);
+                                hideLoading();
+                            }
+                        }
+                    });
+                } else if (isXlsx) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            const sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            const json = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+                            json.forEach(pushNormalized);
+                        } catch (err) {
+                            // swallow and report below
+                        } finally {
+                            processed++;
+                            if (processed === files.length) {
+                                try {
+                                    processScheduleData(allRows);
+                                } catch (error) {
+                                    showError('Error processing the data: ' + error.message);
+                                    hideLoading();
+                                }
+                            }
+                        }
+                    };
+                    reader.onerror = () => {
+                        processed++;
+                        if (processed === files.length) {
+                            showError('Error reading one or more files.');
+                            hideLoading();
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    processed++;
+                    if (processed === files.length) {
+                        processScheduleData(allRows);
+                    }
+                }
+            });
+        }
+
+        function processScheduleData(data) {
+            const teachers = {};
+            const classrooms = {};
+            let totalClasses = 0;
+
+            // Process each row of header-based data (expects keys like 'Course Name', 'Section No', 'Department Name', and days Sunday..Thursday)
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                if (!row) continue;
+
+                const courseName = row['Course Name'];
+                const section = row['Section No'];
+                const departmentName = row['Department Name'];
+                if (!courseName || !section) continue;
+
+                for (let dayIndex = 0; dayIndex < WORK_DAYS.length; dayIndex++) {
+                    const dayName = WORK_DAYS[dayIndex];
+                    const dayData = row[dayName];
+                    if (!dayData || dayData === '-' || (typeof dayData === 'string' && dayData.trim() === '')) continue;
+
+                    const scheduleMatch = String(dayData).match(/(\d{2}:\d{2})-(\d{2}:\d{2})\s*-\s*([^\\]+)\\(.+)/);
+                    if (!scheduleMatch) continue;
+
+                    const [, startTime, endTime, room, teacher] = scheduleMatch;
+                    const cleanTeacher = String(teacher).trim();
+                    const cleanRoom = String(room).trim();
+
+                    if (!teachers[cleanTeacher]) {
+                        teachers[cleanTeacher] = {
+                            name: cleanTeacher,
+                            schedule: {},
+                            totalClasses: 0,
+                            department: departmentName || null
+                        };
+                        WORK_DAYS.forEach(day => {
+                            teachers[cleanTeacher].schedule[day] = {};
+                            WORK_HOURS.forEach(hour => {
+                                teachers[cleanTeacher].schedule[day][hour] = {
+                                    isBusy: false,
+                                    course: null,
+                                    room: null
+                                };
+                            });
+                        });
+                    }
+
+                    if (!classrooms[cleanRoom]) {
+                        classrooms[cleanRoom] = {
+                            name: cleanRoom,
+                            schedule: {},
+                            totalHours: 0,
+                            totalClasses: 0
+                        };
+                        WORK_DAYS.forEach(day => {
+                            classrooms[cleanRoom].schedule[day] = {};
+                            for (let h = 6; h <= 20; h++) {
+                                const hourKey = h.toString().padStart(2, '0') + ':00';
+                                classrooms[cleanRoom].schedule[day][hourKey] = {
+                                    isOccupied: false,
+                                    course: null,
+                                    teacher: null
+                                };
+                            }
+                        });
+                    }
+
+                    const startHour = parseInt(startTime.split(':')[0]);
+                    const endHour = parseInt(endTime.split(':')[0]);
+                    const classDuration = Math.max(0, endHour - startHour);
+
+                    for (let hour = startHour; hour < endHour; hour++) {
+                        const hourKey = hour.toString().padStart(2, '0') + ':00';
+                        if (teachers[cleanTeacher].schedule[dayName][hourKey]) {
+                            teachers[cleanTeacher].schedule[dayName][hourKey] = {
+                                isBusy: true,
+                                course: courseName,
+                                room: cleanRoom,
+                                classId: extractClassId(courseName),
+                                timeRange: `${startTime}-${endTime}`
+                            };
+                        }
+                        if (classrooms[cleanRoom].schedule[dayName][hourKey]) {
+                            classrooms[cleanRoom].schedule[dayName][hourKey] = {
+                                isOccupied: true,
+                                course: courseName,
+                                teacher: cleanTeacher,
+                                classId: extractClassId(courseName),
+                                timeRange: `${startTime}-${endTime}`
+                            };
+                        }
+                    }
+
+                    teachers[cleanTeacher].totalClasses++;
+                    classrooms[cleanRoom].totalHours += classDuration;
+                    classrooms[cleanRoom].totalClasses++;
+                    totalClasses++;
+                }
+            }
+
+            displayResults(teachers, classrooms, totalClasses);
+            hideLoading();
+        }
+
+        function displayResults(teachers, classrooms, totalClasses) {
+            const teacherCount = Object.keys(teachers).length;
+            const teachersArray = Object.values(teachers);
+            const classroomCount = Object.keys(classrooms).length;
+            
+            // Calculate statistics
+            const avgClassesPerTeacher = teacherCount > 0 ? (totalClasses / teacherCount).toFixed(1) : 0;
+            const mostBusyTeacher = teachersArray.length > 0 ? teachersArray.reduce((prev, current) => 
+                (prev.totalClasses > current.totalClasses) ? prev : current) : null;
+
+            // Find common free time slots
+            const commonFreeSlots = findCommonFreeTime(teachers);
+
+            // Display statistics
+            statsSection.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-number">${teacherCount}</div>
+                    <div class="stat-label">Total Teachers</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${classroomCount}</div>
+                    <div class="stat-label">Total Classrooms</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${totalClasses}</div>
+                    <div class="stat-label">Total Classes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number">${avgClassesPerTeacher}</div>
+                    <div class="stat-label">Avg Classes/Teacher</div>
+                </div>
+            `;
+
+            // Display common free time slots
+            displayCommonFreeTime(commonFreeSlots);
+
+            // Display classroom occupancy
+            displayClassroomOccupancy(classrooms);
+
+            // Sort teachers by name
+            teachersArray.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Display teacher schedules
+            teacherSchedules.innerHTML = teachersArray.map(teacher => createTeacherCard(teacher)).join('');
+
+            resultsSection.style.display = 'block';
+        }
+
+        function findCommonFreeTime(teachers) {
+            const teacherNames = Object.keys(teachers);
+            if (teacherNames.length === 0) return {};
+
+            const commonFree = {};
+
+            // Initialize common free time for each day
+            WORK_DAYS.forEach(day => {
+                commonFree[day] = [];
+
+                WORK_HOURS.forEach(hour => {
+                    // Check if ALL teachers are free at this time
+                    const allFree = teacherNames.every(teacherName => 
+                        !teachers[teacherName].schedule[day][hour].isBusy
+                    );
+
+                    if (allFree) {
+                        commonFree[day].push(hour);
+                    }
+                });
+            });
+
+            return commonFree;
+        }
+
+        function displayCommonFreeTime(commonFreeSlots) {
+            const hasAnyCommonTime = Object.values(commonFreeSlots).some(slots => slots.length > 0);
+
+            if (!hasAnyCommonTime) {
+                commonFreeSection.innerHTML = `
+                    <div class="common-free-title">🚫 Common Free Time Slots</div>
+                    <div class="no-common-time">
+                        Unfortunately, there are no time slots when ALL teachers are free simultaneously.
+                        <br><br>
+                        <strong>Suggestions:</strong>
+                        <ul style="text-align: left; margin-top: 10px;">
+                            <li>Consider meeting with smaller groups of teachers</li>
+                            <li>Schedule meetings during lunch breaks or after hours</li>
+                            <li>Use online meeting platforms for flexibility</li>
+                        </ul>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalCommonSlots = Object.values(commonFreeSlots).reduce((sum, slots) => sum + slots.length, 0);
+
+            commonFreeSection.innerHTML = `
+                <div class="common-free-title">✅ Common Free Time Slots (${totalCommonSlots} total)</div>
+                <div class="common-slots-grid">
+                    ${WORK_DAYS.map(day => `
+                        <div class="day-common-slots">
+                            <div class="day-common-title">${day}</div>
+                            <div class="common-time-slots">
+                                ${commonFreeSlots[day].length > 0 
+                                    ? commonFreeSlots[day].map(hour => 
+                                        `<div class="common-time-slot">${hour}</div>`
+                                    ).join('')
+                                    : '<div class="no-slots-day">No common free time</div>'
+                                }
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function displayClassroomOccupancy(classrooms) {
+            const classroomArray = Object.values(classrooms);
+            
+            if (classroomArray.length === 0) {
+                classroomSection.innerHTML = `
+                    <div class="classroom-title">📚 Classroom Occupancy Analysis</div>
+                    <div class="no-common-time">No classroom data available</div>
+                `;
+                return;
+            }
+
+            // Calculate occupancy percentages - find the busiest day and use that as the percentage
+            classroomArray.forEach(classroom => {
+                let maxDailyHours = 0;
+                
+                // Check each day to find the maximum hours used in a single day
+                WORK_DAYS.forEach(day => {
+                    let dailyHours = 0;
+                    for (let h = 6; h <= 20; h++) {
+                        const hourKey = h.toString().padStart(2, '0') + ':00';
+                        if (classroom.schedule[day][hourKey] && classroom.schedule[day][hourKey].isOccupied) {
+                            dailyHours++;
+                        }
+                    }
+                    maxDailyHours = Math.max(maxDailyHours, dailyHours);
+                });
+                
+                // 8 hours = 100%, so each hour = 12.5%
+                classroom.occupancyPercentage = (maxDailyHours * 12.5).toFixed(1);
+                classroom.occupancyCategory = getOccupancyCategory(classroom.occupancyPercentage);
+            });
+
+            // Sort by occupancy percentage (highest first)
+            classroomArray.sort((a, b) => b.occupancyPercentage - a.occupancyPercentage);
+
+            classroomSection.innerHTML = `
+                <div class="classroom-title">📚 Classroom Occupancy Analysis</div>
+                <div class="classroom-grid">
+                    ${classroomArray.map(classroom => createClassroomCard(classroom)).join('')}
+                </div>
+            `;
+        }
+
+        function getOccupancyCategory(percentage) {
+            if (percentage >= 75) return 'high';
+            if (percentage >= 40) return 'medium';
+            return 'low';
+        }
+
+        function createClassroomCard(classroom) {
+            const occupancyClass = `occupancy-${classroom.occupancyCategory}`;
+            
+            return `
+                <div class="classroom-card">
+                    <div class="classroom-header" onclick="toggleClassroom('${classroom.name.replace(/'/g, "\\'")}')">
+                        <div class="classroom-name">${classroom.name}</div>
+                        <div class="occupancy-badge ${occupancyClass}">${classroom.occupancyPercentage}%</div>
+                    </div>
+                    <div class="classroom-details" id="classroom-${classroom.name.replace(/[^a-zA-Z0-9]/g, '_')}">
+                        <div class="occupancy-bar">
+                            <div class="occupancy-fill ${occupancyClass}" style="width: ${Math.min(classroom.occupancyPercentage, 100)}%; background: ${getOccupancyColor(classroom.occupancyPercentage)};"></div>
+                        </div>
+                        
+                        <div class="occupancy-stats">
+                            <div class="stat-box">
+                                <div class="stat-value">${Math.max(...WORK_DAYS.map(day => {
+                                    let dailyHours = 0;
+                                    for (let h = 6; h <= 20; h++) {
+                                        const hourKey = h.toString().padStart(2, '0') + ':00';
+                                        if (classroom.schedule[day][hourKey] && classroom.schedule[day][hourKey].isOccupied) {
+                                            dailyHours++;
+                                        }
+                                    }
+                                    return dailyHours;
+                                }))}h</div>
+                                <div class="stat-label-small">Max Daily Hours</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-value">${classroom.totalClasses}</div>
+                                <div class="stat-label-small">Total Classes</div>
+                            </div>
+                        </div>
+
+                        <div class="daily-schedule">
+                            ${WORK_DAYS.map(day => createDaySchedule(classroom, day)).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function createDaySchedule(classroom, day) {
+            const daySchedule = classroom.schedule[day];
+            // Show hours from 6am to 8pm to capture all possible class times
+            const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+            
+            // Calculate daily occupancy percentage
+            let dailyHours = 0;
+            hours.forEach(hour => {
+                if (daySchedule[hour] && daySchedule[hour].isOccupied) {
+                    dailyHours++;
+                }
+            });
+            const dailyPercentage = (dailyHours * 12.5).toFixed(1);
+            
+            return `
+                <div class="day-schedule">
+                    <div class="day-name">${day} (${dailyPercentage}%)</div>
+                    <div class="time-blocks">
+                        ${hours.map(hour => {
+                            const slot = daySchedule[hour];
+                            const blockClass = slot && slot.isOccupied ? 'occupied' : 'free';
+                            const tooltip = slot && slot.isOccupied 
+                                ? `${slot.timeRange || hour}\n${slot.classId || (slot.course && extractClassId(slot.course)) || ''} • ${slot.room || ''}\n${slot.course || ''}\nLecturer: ${slot.teacher || ''}`.trim()
+                                : `${hour}: Free`;
+                            return `<div class="time-block ${blockClass} has-tooltip" data-tooltip="${tooltip}"></div>`;
+                        }).join('')}
+                    </div>
+                    <div class="time-labels">
+                        ${hours.map(hour => `<div class="time-label">${hour.substring(0, 2)}</div>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function getOccupancyColor(percentage) {
+            if (percentage >= 75) return '#d32f2f';
+            if (percentage >= 40) return '#f57c00';
+            return '#388e3c';
+        }
+
+        function toggleClassroom(classroomName) {
+            const classroomId = 'classroom-' + classroomName.replace(/[^a-zA-Z0-9]/g, '_');
+            const classroomElement = document.getElementById(classroomId);
+            classroomElement.classList.toggle('expanded');
+        }
+
+        function createTeacherCard(teacher) {
+            const freeSlots = countFreeSlots(teacher.schedule);
+            
+            return `
+                <div class="teacher-card">
+                    <div class="teacher-header" onclick="toggleSchedule('${teacher.name.replace(/'/g, "\\'")}')">
+                        <div class="teacher-name">${teacher.name}</div>
+                        <div class="class-count">${teacher.totalClasses} classes • ${freeSlots} free slots</div>
+                    </div>
+                    <div class="schedule-content" id="schedule-${teacher.name.replace(/[^a-zA-Z0-9]/g, '_')}">
+                        ${createScheduleGrid(teacher.schedule)}
+                    </div>
+                </div>
+            `;
+        }
+
+        function createScheduleGrid(schedule) {
+            return WORK_DAYS.map(day => `
+                <div class="day-section">
+                    <div class="day-title">${day}</div>
+                    <div class="time-slots">
+                        ${WORK_HOURS.map(hour => {
+                            const slot = schedule[day][hour];
+                            const className = slot.isBusy ? 'busy-slot' : 'free-slot';
+                            const label = slot.isBusy ? `${slot.timeRange || hour} ${slot.classId || (slot.course && extractClassId(slot.course)) || ''} - ${slot.room || ''}`.trim() : `${hour} (Free)`;
+                            const tooltip = slot.isBusy 
+                                ? `${slot.timeRange || hour}\n${slot.classId || (slot.course && extractClassId(slot.course)) || ''} • ${slot.room || ''}\n${slot.course || ''}`
+                                : `${hour}: Free`;
+                            return `<div class="time-slot ${className} has-tooltip" data-tooltip="${tooltip}">${label}</div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function countFreeSlots(schedule) {
+            let freeCount = 0;
+            WORK_DAYS.forEach(day => {
+                WORK_HOURS.forEach(hour => {
+                    if (!schedule[day][hour].isBusy) {
+                        freeCount++;
+                    }
+                });
+            });
+            return freeCount;
+        }
+
+        function toggleSchedule(teacherName) {
+            const scheduleId = 'schedule-' + teacherName.replace(/[^a-zA-Z0-9]/g, '_');
+            const scheduleElement = document.getElementById(scheduleId);
+            scheduleElement.classList.toggle('expanded');
+        }
+
+        function showLoading() {
+            loadingSection.style.display = 'block';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideLoading() {
+            loadingSection.style.display = 'none';
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+            
+            // Insert after upload section
+            const uploadSection = document.querySelector('.upload-section');
+            uploadSection.insertAdjacentElement('afterend', errorDiv);
+            
+            // Remove error after 5 seconds
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+    </script>
+    <footer class="app-footer">© Amjad Al Kharusi</footer>
+</body>
+</html>
