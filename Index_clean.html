@@ -1,0 +1,2900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Schedule Analyzer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    
+    <!-- Custom JavaScript modules -->
+    <script src="js/config.js"></script>
+    <script src="js/fileHandler.js"></script>
+    <script src="js/scheduleAnalyzer.js"></script>
+    <script src="js/classroomAnalyzer.js"></script>
+    <script src="js/timeQuery.js"></script>
+    
+    <!-- Reschedule modules (must load in this order) -->
+    <script src="js/rescheduleCore.js"></script>
+    <script src="js/rescheduleSearch.js"></script>
+    <script src="js/reschedulePreview.js"></script>
+    <script src="js/rescheduleReport.js"></script>
+    <script src="js/rescheduleUI.js"></script>
+    <script src="js/rescheduleAutoAssign.js"></script>
+    <script src="js/rescheduleHelper.js"></script>
+    
+    <script src="js/pdfExporter.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .upload-section {
+            padding: 40px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .drop-zone {
+            border: 3px dashed #667eea;
+            border-radius: 10px;
+            padding: 60px 20px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #5a6fd8;
+            background: #f0f2ff;
+            transform: translateY(-2px);
+        }
+
+        .drop-zone.dragover {
+            border-color: #4CAF50;
+            background: #f0fff0;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .results-section {
+            padding: 40px;
+            display: none;
+        }
+
+        .stats {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .time-query-section {
+            margin: 0 40px 20px 40px;
+            display: none;
+        }
+
+        .time-query-section > div {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-query-section label {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .time-query-section input,
+        .time-query-section select {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            min-width: 160px;
+        }
+
+        .common-free-section {
+            background: linear-gradient(135deg, #e8f5e8, #f0fff0);
+            border: 2px solid #4CAF50;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .common-free-title {
+            font-size: 1.5em;
+            color: #2e7d32;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .no-common-time {
+            text-align: center;
+            color: #f44336;
+            font-size: 1.1em;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 10px;
+            border: 2px solid #ffcdd2;
+        }
+
+        .common-slots-grid {
+            display: grid;
+            gap: 15px;
+        }
+
+        .day-common-slots {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #c8e6c9;
+        }
+
+        .day-common-title {
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .common-time-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .common-time-slot {
+            background: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .no-slots-day {
+            color: #999;
+            font-style: italic;
+        }
+
+        .classroom-occupancy-section {
+            background: linear-gradient(135deg, #fff3e0, #fafafa);
+            border: 2px solid #ff9800;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .classroom-title {
+            font-size: 1.5em;
+            color: #e65100;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .export-pdf-btn {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .export-pdf-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .classroom-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .classroom-card {
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #ffcc02;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .classroom-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(255, 152, 0, 0.15);
+        }
+
+        .classroom-header {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+            color: white;
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .classroom-name {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .occupancy-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .occupancy-high {
+            background: #d32f2f !important;
+        }
+
+        .occupancy-medium {
+            background: #f57c00 !important;
+        }
+
+        .occupancy-low {
+            background: #388e3c !important;
+        }
+
+        .classroom-details {
+            display: none;
+            padding: 20px;
+        }
+
+        .classroom-details.expanded {
+            display: block;
+        }
+
+        .occupancy-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .occupancy-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .occupancy-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .stat-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #ff9800;
+        }
+
+        .stat-label-small {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .daily-schedule {
+            margin-top: 15px;
+        }
+
+        .day-schedule {
+            margin-bottom: 15px;
+        }
+
+        .day-name {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 8px;
+            font-size: 1.05em;
+        }
+
+        .time-blocks {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 2px;
+            height: 25px;
+        }
+
+        .time-block {
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .time-block.occupied {
+            background: #ff9800;
+        }
+
+        .time-block.free {
+            background: #e0e0e0;
+        }
+
+        .time-labels {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 2px;
+            margin-top: 5px;
+            font-size: 0.7em;
+            color: #666;
+        }
+
+        .time-label {
+            text-align: center;
+        }
+
+        .teacher-card {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .teacher-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .teacher-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            cursor: pointer;
+        }
+
+        .teacher-name {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .class-count {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .schedule-content {
+            display: none;
+            padding: 20px;
+        }
+
+        .schedule-content.expanded {
+            display: block;
+        }
+
+        .day-section {
+            margin-bottom: 20px;
+        }
+
+        .day-title {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .time-slots {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 8px;
+        }
+
+        .time-slot {
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .busy-slot {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .free-slot {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #f44336;
+        }
+
+        /* Rich tooltip styling */
+        .has-tooltip { position: relative; }
+        .has-tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 130%;
+            background: #2c3e50;
+            color: #fff;
+            padding: 8px 10px;
+            border-radius: 6px;
+            white-space: pre-line;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+            font-size: 0.85em;
+            max-width: 260px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .has-tooltip:hover::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 120%;
+            border: 6px solid transparent;
+            border-top-color: #2c3e50;
+            z-index: 1001;
+            pointer-events: none;
+        }
+        .app-footer {
+            text-align: center;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 16px 0;
+            margin-top: 24px;
+        }
+
+        /* Reschedule Section Styles */
+        .reschedule-section {
+            background: linear-gradient(135deg, #e3f2fd, #f5f5f5);
+            border: 2px solid #2196F3;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 0 40px 30px 40px;
+        }
+
+        .reschedule-title {
+            font-size: 1.5em;
+            color: #1565C0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .reschedule-form {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
+        }
+
+        .reschedule-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .reschedule-field {
+            flex: 1;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .reschedule-field.full-width {
+            flex: 100%;
+            min-width: 100%;
+        }
+
+        .reschedule-field label {
+            display: block;
+            font-weight: 600;
+            color: #1565C0;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .reschedule-field input,
+        .reschedule-field select {
+            width: 100%;
+            padding: 12px 14px;
+            border: 2px solid #90CAF9;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .reschedule-field input:focus,
+        .reschedule-field select:focus {
+            outline: none;
+            border-color: #2196F3;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+        }
+
+        .field-hint {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 6px;
+        }
+
+        .course-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #90CAF9;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .course-suggestions.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            padding: 10px 14px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+
+        .suggestion-item:hover {
+            background: #e3f2fd;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-code {
+            font-weight: 600;
+            color: #1565C0;
+        }
+
+        .suggestion-name {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .reschedule-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        .reschedule-btn {
+            background: linear-gradient(135deg, #2196F3, #1565C0);
+            padding: 14px 30px;
+            font-size: 16px;
+        }
+
+        .clear-btn {
+            background: linear-gradient(135deg, #78909C, #546E7A);
+            padding: 14px 30px;
+            font-size: 16px;
+        }
+
+        #rescheduleResults {
+            margin-top: 25px;
+        }
+
+        .available-slots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .slot-card {
+            background: white;
+            border-radius: 12px;
+            border: 2px solid #4CAF50;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .slot-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(76, 175, 80, 0.2);
+        }
+
+        .slot-header {
+            background: linear-gradient(135deg, #4CAF50, #388E3C);
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+        }
+
+        .slot-time {
+            font-size: 1.1em;
+        }
+
+        .slot-body {
+            padding: 15px;
+        }
+
+        .slot-classroom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+
+        .slot-classroom:last-child {
+            margin-bottom: 0;
+        }
+
+        .classroom-icon {
+            font-size: 1.2em;
+        }
+
+        .classroom-name {
+            font-weight: 600;
+            color: #2e7d32;
+        }
+
+        .no-conflicts-badge {
+            display: inline-block;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-top: 10px;
+        }
+
+        .conflict-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff3e0;
+            border-radius: 10px;
+            border: 1px solid #ffcc80;
+        }
+
+        .conflict-info-title {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .conflict-course-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .conflict-course-tag {
+            background: #ffecb3;
+            color: #e65100;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        /* Instructor Selection Chips */
+        .instructor-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .instructor-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .instructor-chip:hover {
+            background: #e3f2fd;
+            border-color: #90CAF9;
+        }
+
+        .instructor-chip.selected {
+            background: #1565C0;
+            border-color: #1565C0;
+            color: white;
+        }
+
+        .instructor-chip.selected:hover {
+            background: #1976D2;
+            border-color: #1976D2;
+        }
+
+        .instructor-chip-icon {
+            font-size: 1.2em;
+        }
+
+        .instructor-chip-name {
+            font-weight: 500;
+        }
+
+        .instructor-chip-classes {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        .instructor-info-box {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .instructor-info-title {
+            font-weight: 600;
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instructor-schedule-preview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .instructor-busy-slot {
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 5px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+        }
+
+        .no-instructors-msg {
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+        }
+
+        /* Multi-Day Checkboxes */
+        .day-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .day-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .day-checkbox-label:hover {
+            background: #e3f2fd;
+            border-color: #90CAF9;
+        }
+
+        .day-checkbox-label.checked {
+            background: #1565C0;
+            border-color: #1565C0;
+            color: white;
+        }
+
+        .day-checkbox-label input {
+            display: none;
+        }
+
+        .day-checkbox-icon {
+            font-size: 1.1em;
+        }
+
+        /* Selectable Slot Cards */
+        .slot-card.selectable {
+            cursor: pointer;
+            position: relative;
+        }
+
+        .slot-card.selectable:hover {
+            border-color: #2196F3;
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.25);
+        }
+
+        .slot-card.selected {
+            border-color: #1565C0;
+            border-width: 3px;
+            box-shadow: 0 8px 25px rgba(21, 101, 192, 0.3);
+        }
+
+        .slot-card.selected .slot-header {
+            background: linear-gradient(135deg, #1565C0, #0D47A1);
+        }
+
+        .slot-select-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .slot-card.selected .slot-select-indicator {
+            background: #1565C0;
+            border-color: #1565C0;
+            color: white;
+        }
+
+        /* Schedule Preview Section */
+        .schedule-preview-section {
+            margin-top: 30px;
+            background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+            border: 2px solid #66BB6A;
+            border-radius: 15px;
+            padding: 25px;
+        }
+
+        .schedule-preview-title {
+            font-size: 1.4em;
+            color: #2e7d32;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .preview-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .preview-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .preview-card-header {
+            padding: 15px 20px;
+            font-weight: 600;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .preview-card-header.instructor {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+        }
+
+        .preview-card-header.classroom {
+            background: linear-gradient(135deg, #ff9800, #f57c00);
+        }
+
+        .preview-card-body {
+            padding: 20px;
+        }
+
+        .preview-day-row {
+            margin-bottom: 15px;
+        }
+
+        .preview-day-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .preview-day-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .preview-time-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .preview-time-block {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 500;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .preview-time-block.busy {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+
+        .preview-time-block.free {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .preview-time-block.new-slot {
+            background: #1565C0;
+            color: white;
+            animation: pulse-new 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-new {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .preview-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+            justify-content: center;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+
+        .legend-color.busy { background: #ffcdd2; }
+        .legend-color.free { background: #e8f5e9; }
+        .legend-color.new-slot { background: #1565C0; }
+
+        .classroom-select-dropdown {
+            margin-top: 10px;
+        }
+
+        .classroom-select-dropdown select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .section-select-dropdown select {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #1565C0;
+            border-radius: 8px;
+            font-size: 13px;
+            background: #e3f2fd;
+            color: #1565C0;
+            font-weight: 600;
+        }
+
+        .section-select-dropdown select:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.2);
+        }
+
+        /* Section Selection Styles */
+        .selected-sections-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .section-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border: 2px solid #2196F3;
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+
+        .section-chip-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-chip-code {
+            font-weight: 700;
+            color: #1565C0;
+        }
+
+        .section-chip-schedule {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .section-chip-remove {
+            background: #f44336;
+            color: white;
+            border: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 5px;
+        }
+
+        .section-chip-remove:hover {
+            background: #d32f2f;
+        }
+
+        .suggestion-item.section {
+            border-left: 4px solid #2196F3;
+        }
+
+        .suggestion-section {
+            font-size: 0.8em;
+            color: #1565C0;
+            background: #e3f2fd;
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        .suggestion-schedule {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .suggestion-room {
+            font-size: 0.85em;
+            color: #1565c0;
+            font-weight: 600;
+            margin-top: 4px;
+            background: #e3f2fd;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .suggestion-instructor {
+            font-size: 0.8em;
+            color: #9c27b0;
+            margin-top: 2px;
+        }
+
+        .current-slots-preview {
+            background: #fff3e0;
+            border: 1px solid #ffcc80;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .current-slots-title {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .current-slot-tag {
+            display: inline-block;
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            margin: 3px;
+        }
+
+        .preview-time-block.removing {
+            background: #ffcdd2;
+            color: #c62828;
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        /* Working Hours Badge */
+        .working-hours-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1565C0;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+
+        .working-hours-badge.free-day {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .preview-day-name {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        /* Enhanced tooltip for schedule blocks */
+        .preview-time-block {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .preview-time-block[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.8em;
+            white-space: pre-line;
+            z-index: 1000;
+            min-width: 150px;
+            max-width: 250px;
+            text-align: left;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            pointer-events: none;
+            margin-bottom: 5px;
+        }
+
+        .preview-time-block[title]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #2c3e50;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        .preview-time-block.removing {
+            background: linear-gradient(135deg, #ffcdd2, #ef9a9a);
+            color: #b71c1c;
+            font-weight: 600;
+            opacity: 0.85;
+            border: 1px dashed #c62828;
+        }
+
+        /* Professional Export Buttons */
+        .export-buttons-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 25px;
+            border: 1px solid #dee2e6;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .export-section-title {
+            text-align: center;
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 20px;
+        }
+
+        .export-buttons-row {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .export-btn {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 18px 25px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 280px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .export-btn.teacher-report {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            box-shadow: 0 4px 15px rgba(25, 118, 210, 0.3);
+        }
+
+        .export-btn.classroom-report {
+            background: linear-gradient(135deg, #388E3C 0%, #2E7D32 100%);
+            box-shadow: 0 4px 15px rgba(56, 142, 60, 0.3);
+        }
+
+        .export-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .export-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .export-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .export-btn:hover::before {
+            left: 100%;
+        }
+
+        .export-btn-icon {
+            font-size: 2em;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+        }
+
+        .export-btn-text {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 3px;
+        }
+
+        .export-btn-title {
+            font-size: 1.1em;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .export-btn-desc {
+            font-size: 0.8em;
+            color: rgba(255,255,255,0.85);
+        }
+
+        .export-btn-badge {
+            background: rgba(255,255,255,0.25);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin-left: auto;
+        }
+
+        @media (max-width: 768px) {
+            .export-buttons-row {
+                flex-direction: column;
+                align-items: center;
+            }
+            .export-btn {
+                min-width: 100%;
+                max-width: 320px;
+            }
+        }
+
+        /* Conflict Groups UI */
+        .conflict-groups-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .conflict-group {
+            border: 2px solid #1976D2;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #E3F2FD;
+        }
+
+        .conflict-group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            background: #1976D2;
+            color: white;
+        }
+
+        .group-name-input {
+            font-size: 1em;
+            font-weight: 600;
+            outline: none;
+            width: 200px;
+        }
+
+        .group-name-input:focus {
+            background: rgba(255,255,255,0.2) !important;
+            border-radius: 4px;
+            padding: 2px 6px;
+        }
+
+        .remove-group-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .remove-group-btn:hover {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.1);
+        }
+
+        .conflict-group-body {
+            padding: 15px;
+        }
+
+        .group-sections {
+            margin-bottom: 15px;
+        }
+
+        .group-section-label,
+        .group-conflicts-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .group-sections-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .group-section-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            border: 2px solid #1976D2;
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .group-section-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .group-section-code {
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .group-section-schedule {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        .group-section-room {
+            font-size: 0.8em;
+            color: #1565c0;
+            font-weight: 600;
+            background: rgba(25, 118, 210, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-right: 6px;
+        }
+
+        .group-section-chip.expanded {
+            padding: 0;
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .group-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .group-section-slots {
+            padding: 8px 10px;
+        }
+
+        .slots-label {
+            font-size: 0.75em;
+            color: #666;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .slots-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .slot-checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85em;
+        }
+
+        .slot-checkbox-item.selected {
+            background: #e3f2fd;
+            border-color: #1976d2;
+        }
+
+        .slot-checkbox-item.not-selected {
+            background: #f5f5f5;
+            border-color: #ccc;
+            opacity: 0.6;
+        }
+
+        .slot-checkbox-item:hover {
+            border-color: #1976d2;
+            opacity: 1;
+        }
+
+        .slot-checkbox-item input[type="checkbox"] {
+            width: 14px;
+            height: 14px;
+            accent-color: #1976d2;
+        }
+
+        .slot-info {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .slot-day {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .slot-time {
+            color: #666;
+        }
+
+        .slot-room {
+            color: #1565c0;
+            font-weight: 500;
+            background: rgba(25, 118, 210, 0.1);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        .group-section-remove {
+            background: #ffebee;
+            border: none;
+            color: #c62828;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .group-section-remove:hover {
+            background: #ffcdd2;
+            transform: scale(1.1);
+        }
+
+        .no-sections-msg {
+            color: #999;
+            font-style: italic;
+            font-size: 0.9em;
+            padding: 10px;
+        }
+
+        .group-conflicts-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .group-conflicts-input:focus {
+            outline: none;
+            border-color: #1976D2;
+        }
+
+        .group-conflicts-hint {
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .add-group-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 15px;
+            border: 2px dashed #aaa;
+            border-radius: 12px;
+            background: #f9f9f9;
+            cursor: pointer;
+            color: #666;
+            font-size: 1em;
+            transition: all 0.2s;
+        }
+
+        .add-group-btn:hover {
+            border-color: #1976D2;
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+
+        /* Group Selection Popup */
+        .group-selection-popup {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            min-width: 220px;
+            overflow: hidden;
+            animation: popupFadeIn 0.2s ease;
+        }
+
+        @keyframes popupFadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .popup-header {
+            padding: 12px 15px;
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 1px solid #eee;
+        }
+
+        .popup-group-option {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .popup-group-option:hover {
+            background: #f5f5f5;
+        }
+
+        .popup-group-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .popup-group-name {
+            font-weight: 500;
+        }
+
+        .popup-group-count {
+            color: #888;
+            font-size: 0.85em;
+            margin-left: auto;
+        }
+
+        .popup-group-option.new-group {
+            border-top: 1px solid #eee;
+            color: #1976D2;
+        }
+
+        /* Slot Group Availability Badges */
+        .slot-group-availability {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .group-availability-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+            border: 1px solid;
+        }
+
+        .group-availability-badge.available {
+            background: #E8F5E9;
+            border-color: #4CAF50;
+            color: #2E7D32;
+        }
+
+        .group-availability-badge.conflict {
+            background: #FFEBEE;
+            border-color: #EF5350;
+            color: #C62828;
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+
+        /* Section Availability Badges */
+        .slot-section-availability {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .section-availability-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.75em;
+            font-weight: 600;
+            border: 1px solid;
+            cursor: default;
+        }
+
+        .section-availability-badge.available {
+            background: #E8F5E9;
+            border-color: #4CAF50;
+            color: #2E7D32;
+        }
+
+        .section-availability-badge.conflict {
+            background: #FFEBEE;
+            border-color: #EF5350;
+            color: #C62828;
+            text-decoration: line-through;
+            opacity: 0.8;
+        }
+
+        /* Slot Assignment Rows */
+        .slot-assignments {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 12px 0;
+            padding: 12px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .assignment-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .assignment-row select {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .assignment-row select:focus {
+            outline: none;
+            border-color: #1976D2;
+        }
+
+        .assignment-arrow {
+            color: #1976D2;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .remove-assignment-btn {
+            background: #FFEBEE;
+            border: none;
+            color: #C62828;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .remove-assignment-btn:hover {
+            background: #FFCDD2;
+            transform: scale(1.1);
+        }
+
+        .add-assignment-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            background: #E3F2FD;
+            border: 2px dashed #90CAF9;
+            border-radius: 8px;
+            color: #1565C0;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-assignment-btn:hover {
+            background: #BBDEFB;
+            border-color: #1976D2;
+        }
+
+        .slot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .slot-capacity {
+            font-size: 0.8em;
+            color: #888;
+            background: #f5f5f5;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .slot-card.selected {
+            border-color: #4CAF50 !important;
+            background: linear-gradient(135deg, #E8F5E9 0%, #fff 100%);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+
+        .slot-card.selected .slot-header {
+            color: #2E7D32;
+        }
+
+        /* Multi-Instructor Selection UI */
+        .instructor-selection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .instructor-selection-label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .select-all-instructors-btn {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            color: #1565c0;
+            padding: 6px 14px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .select-all-instructors-btn:hover {
+            background: #bbdefb;
+        }
+
+        .instructor-chips-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .instructor-chip {
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            background: #f9f9f9;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .instructor-chip:hover {
+            border-color: #90caf9;
+            background: #f5f5f5;
+        }
+
+        .instructor-chip.selected {
+            border-color: #4CAF50;
+            background: #E8F5E9;
+        }
+
+        .instructor-chip-main {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .instructor-chip-icon {
+            font-size: 1.2em;
+        }
+
+        .instructor-chip-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .instructor-chip-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 6px;
+        }
+
+        .instructor-group-badge {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid;
+        }
+
+        .instructor-chip-classes {
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        .instructor-chip-check {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            font-size: 1.1em;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        /* Multi-Instructor Preview */
+        .multi-instructor-preview {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .multi-instructor-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #1565c0;
+            margin-bottom: 12px;
+            font-size: 1.05em;
+        }
+
+        .multi-instructor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .instructor-preview-card {
+            background: white;
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .instructor-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .instructor-preview-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .instructor-preview-sections {
+            font-size: 0.8em;
+            color: #888;
+            background: #f5f5f5;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .instructor-preview-groups {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .preview-group-badge {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 8px;
+            border: 1px solid;
+        }
+
+        .instructor-preview-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .instructor-preview-slots .instructor-busy-slot {
+            font-size: 0.75em;
+            padding: 2px 6px;
+        }
+
+        .instructor-preview-slots .instructor-busy-slot.more {
+            background: #e0e0e0;
+            color: #666;
+        }
+
+        .instructor-preview-free {
+            color: #2e7d32;
+            font-size: 0.9em;
+        }
+
+        /* Section Settings Panel */
+        .section-settings-panel {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 18px;
+            margin-top: 20px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .settings-header {
+            font-weight: 600;
+            color: #1565C0;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .settings-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .section-setting-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border: 1px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        .setting-label {
+            font-weight: 600;
+            color: #333;
+            min-width: 140px;
+            font-size: 0.95em;
+        }
+
+        .section-setting-row select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 0.9em;
+            background: #f9f9f9;
+            cursor: pointer;
+            min-width: 100px;
+        }
+
+        .section-setting-row select:focus {
+            outline: none;
+            border-color: #1976D2;
+            background: white;
+        }
+
+        /* Auto-Assign Button */
+        .auto-assign-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 30px;
+            color: white;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .auto-assign-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .auto-assign-btn:active {
+            transform: translateY(0);
+        }
+
+        /* Conflict Groups */
+        .conflict-groups-container {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .conflict-group {
+            border-radius: 14px;
+            border: 2px solid;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .conflict-group-header {
+            padding: 12px 18px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .group-name-input {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1.05em;
+            padding: 6px 12px;
+            border-radius: 8px;
+            flex: 1;
+        }
+
+        .group-name-input:focus {
+            outline: none;
+            background: rgba(255,255,255,0.3);
+        }
+
+        .remove-group-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        .remove-group-btn:hover {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .conflict-group-body {
+            padding: 18px;
+            background: white;
+        }
+
+        .group-sections, .group-conflicts {
+            margin-bottom: 15px;
+        }
+
+        .group-section-label, .group-conflicts-label {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .group-sections-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .group-section-chip {
+            display: flex;
+            align-items: center;
+            background: #f9f9f9;
+            border: 2px solid;
+            border-radius: 25px;
+            padding: 8px 16px;
+            font-size: 0.9em;
+        }
+
+        .group-section-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .group-section-code {
+            font-weight: 700;
+        }
+
+        .group-section-schedule {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .group-section-remove {
+            background: none;
+            border: none;
+            color: #999;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: color 0.2s;
+        }
+
+        .group-section-remove:hover {
+            color: #f44336;
+        }
+
+        .group-conflicts-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 0.95em;
+        }
+
+        .group-conflicts-input:focus {
+            outline: none;
+            border-color: #1976D2;
+        }
+
+        .no-sections-msg {
+            color: #999;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        .add-group-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 22px;
+            background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        .add-group-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        /* Multi-Instructor Preview */
+        .multi-instructor-preview {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f5f5f5 100%);
+            border-radius: 14px;
+            padding: 18px;
+            margin-top: 18px;
+            border: 1px solid #bbdefb;
+        }
+
+        .multi-instructor-header {
+            font-weight: 600;
+            color: #1565C0;
+            margin-bottom: 14px;
+            font-size: 1.05em;
+        }
+
+        .multi-instructor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .instructor-preview-card {
+            background: white;
+            border-radius: 10px;
+            padding: 14px;
+            border-left: 4px solid #1976D2;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+
+        .instructor-preview-name {
+            font-weight: 600;
+            font-size: 0.95em;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .instructor-preview-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .instructor-busy-slot {
+            background: #FFECB3;
+            color: #F57C00;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .instructor-busy-slot.more {
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+
+        /* Group Selection Popup */
+        .group-selection-popup {
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+            overflow: hidden;
+            min-width: 220px;
+        }
+
+        .popup-header {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            padding: 12px 18px;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .popup-group-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 18px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .popup-group-option:hover {
+            background: #f5f8ff;
+        }
+
+        .popup-group-option:last-child {
+            border-bottom: none;
+        }
+
+        .popup-group-option.new-group {
+            color: #4CAF50;
+            font-weight: 600;
+            background: #f9fff9;
+        }
+
+        .popup-group-option.new-group:hover {
+            background: #e8f5e9;
+        }
+
+        .popup-group-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+        }
+
+        /* Instructor Chips */
+        .instructor-selection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .select-all-instructors-btn {
+            background: white;
+            border: 2px solid #1976D2;
+            color: #1976D2;
+            padding: 6px 14px;
+            border-radius: 18px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .select-all-instructors-btn:hover {
+            background: #E3F2FD;
+        }
+
+        .instructor-chips-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .instructor-chip {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 28px;
+            padding: 10px 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 150px;
+        }
+
+        .instructor-chip:hover {
+            border-color: #1976D2;
+            background: #f9fcff;
+        }
+
+        .instructor-chip.selected {
+            background: #E3F2FD;
+            border-color: #1976D2;
+        }
+
+        .instructor-chip-name {
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+
+        .instructor-chip-check {
+            color: #4CAF50;
+            font-weight: bold;
+            margin-left: 10px;
+            font-size: 1.1em;
+        }
+
+        /* Slot Card Improvements */
+        .slot-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 14px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+
+        .slot-card:hover {
+            border-color: #90CAF9;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .slot-card.selected {
+            border-color: #4CAF50;
+            background: #f9fff9;
+            box-shadow: 0 4px 20px rgba(76,175,80,0.2);
+        }
+
+        .slot-header {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .slot-time {
+            font-weight: 700;
+            color: #1565C0;
+            font-size: 1.05em;
+        }
+
+        .slot-capacity {
+            font-size: 0.85em;
+            color: #666;
+            background: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+
+        .slot-body {
+            padding: 16px;
+        }
+
+        .slot-group-availability,
+        .slot-section-availability {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+
+        /* Assignment Row Improvements */
+        .add-assignment-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: transparent;
+            border: 2px dashed #90CAF9;
+            border-radius: 10px;
+            color: #1976D2;
+            font-size: 0.9em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-assignment-btn:hover {
+            background: #E3F2FD;
+            border-color: #1976D2;
+        }
+
+        .remove-assignment-btn {
+            background: #ffebee;
+            border: none;
+            color: #f44336;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .remove-assignment-btn:hover {
+            background: #f44336;
+            color: white;
+        }
+
+        .available-slots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 18px;
+            margin-bottom: 25px;
+        }
+
+        /* Scheduling Constraints */
+        .constraints-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 12px;
+            background: #fff8e1;
+            border-radius: 10px;
+            border: 1px solid #ffcc02;
+        }
+
+        .constraint-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            padding: 8px 15px;
+            background: white;
+            border-radius: 20px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.2s;
+        }
+
+        .constraint-checkbox:hover {
+            border-color: #ff9800;
+        }
+
+        .constraint-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .constraint-checkbox input[type="checkbox"]:checked + .constraint-text {
+            color: #e65100;
+            font-weight: 600;
+        }
+
+        .constraint-text {
+            font-size: 0.95em;
+            color: #555;
+        }
+
+        .constraint-label {
+            font-weight: 600;
+            color: #e65100;
+            margin-bottom: 10px;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Teacher Schedule Analyzer</h1>
+            <p>Upload your course schedule CSV to find when teachers are available and analyze classroom occupancy</p>
+        </div>
+
+        <div class="upload-section">
+            <div class="drop-zone" id="dropZone">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text">Drop your CSV file here or click to browse</div>
+                <button class="btn" onclick="document.getElementById('fileInput').click()">
+                    Choose File
+                </button>
+                <input type="file" id="fileInput" class="file-input" accept=".csv,.xlsx,.xls" multiple />
+            </div>
+        </div>
+
+        <div class="results-section" id="resultsSection">
+            <div class="stats" id="statsSection"></div>
+            <div class="time-query-section" id="timeQuerySection">
+                <div>
+                    <label for="timeQueryInput">Who has class at</label>
+                    <input id="timeQueryInput" type="text" placeholder="e.g. 11am or 13:00">
+                    <select id="timeQueryDay">
+                        <option value="ALL">All Days</option>
+                    </select>
+                    <button class="btn" id="timeQueryBtn">Find</button>
+                </div>
+                <div id="timeQueryResults" style="margin-top:15px;"></div>
+                
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;">
+                        <label for="timeRangeStart">Who is free from</label>
+                        <input id="timeRangeStart" type="text" placeholder="e.g. 10am or 10:00" style="min-width: 120px;">
+                        <label for="timeRangeEnd">to</label>
+                        <input id="timeRangeEnd" type="text" placeholder="e.g. 12pm or 12:00" style="min-width: 120px;">
+                        <select id="timeRangeDay">
+                            <option value="ALL">All Days</option>
+                        </select>
+                        <button class="btn" id="timeRangeBtn">Find Free</button>
+                    </div>
+                    <div id="timeRangeResults" style="margin-top:15px;"></div>
+                </div>
+            </div>
+            
+            <!-- Conflict-Free Rescheduling Section -->
+            <div class="reschedule-section" id="rescheduleSection" style="display: none;">
+                <div class="reschedule-title">🔄 Conflict-Free Course Rescheduler</div>
+                <div class="reschedule-form">
+                    <div class="reschedule-row">
+                        <div class="reschedule-field">
+                            <label for="courseToMove">Search Section to Move</label>
+                            <input type="text" id="courseToMove" placeholder="Search by course code, e.g., CIGD3212" autocomplete="off">
+                            <div class="course-suggestions" id="courseToMoveSuggestions"></div>
+                        </div>
+                        <div class="reschedule-field">
+                            <label for="requiredDuration">Duration (hours)</label>
+                            <select id="requiredDuration">
+                                <option value="1">1 hour</option>
+                                <option value="2" selected>2 hours</option>
+                                <option value="3">3 hours</option>
+                                <option value="4">4 hours</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Selected Sections -->
+                    <div class="reschedule-row" id="selectedSectionsRow" style="display: none;">
+                        <div class="reschedule-field full-width">
+                            <label>Selected Sections to Move</label>
+                            <div class="selected-sections-list" id="selectedSectionsList"></div>
+                            <div class="field-hint">👆 These sections' current time slots will be freed up. Select new times below.</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Multi-Day Selection -->
+                    <div class="reschedule-row">
+                        <div class="reschedule-field full-width">
+                            <label>Select Days (choose one or more)</label>
+                            <div class="day-checkboxes" id="dayCheckboxes"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Instructor Selection -->
+                    <div class="reschedule-row" id="instructorSelectionRow" style="display: none;">
+                        <div class="reschedule-field full-width">
+                            <label>Select Instructor (their schedule will be checked for conflicts)</label>
+                            <div class="instructor-chips" id="instructorChips"></div>
+                            <div class="field-hint">👆 Click an instructor to select. The new time slot won't conflict with their other classes.</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Specific Classrooms -->
+                    <div class="reschedule-row">
+                        <div class="reschedule-field full-width">
+                            <label for="specificClassrooms">Preferred Classrooms (optional, comma-separated)</label>
+                            <input type="text" id="specificClassrooms" placeholder="e.g., HL102, CT108 (leave empty for all classrooms)">
+                            <div class="field-hint">💡 Only show these classrooms in results. Leave empty to see all available classrooms.</div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduling Constraints -->
+                    <div class="reschedule-row">
+                        <div class="reschedule-field full-width">
+                            <label class="constraint-label">Scheduling Constraints</label>
+                            <div class="constraints-container">
+                                <label class="constraint-checkbox">
+                                    <input type="checkbox" id="noThursdayAfternoon" checked>
+                                    <span class="constraint-text">🚫 No classes after 2pm on Thursday</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Conflict Courses -->
+                    <div class="reschedule-row">
+                        <div class="reschedule-field full-width">
+                            <label for="conflictCourses">Courses that should NOT conflict (comma-separated codes)</label>
+                            <input type="text" id="conflictCourses" placeholder="e.g., CIMD2207, CIGD3100, COMP1010">
+                            <div class="field-hint">💡 These are courses whose students also attend. The new slot won't overlap with these courses.</div>
+                        </div>
+                    </div>
+                    <div class="reschedule-actions">
+                        <button class="btn reschedule-btn" id="findSlotsBtn">🔍 Find Available Slots</button>
+                        <button class="btn clear-btn" id="clearRescheduleBtn">Clear</button>
+                    </div>
+                </div>
+                <div id="rescheduleResults"></div>
+            </div>
+            
+            <div class="common-free-section" id="commonFreeSection"></div>
+            <div class="classroom-occupancy-section" id="classroomSection">
+                <div class="search-filter-container" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 10px; border: 1px solid #ffcc02;">
+                    <label for="classroomSearch" style="display: block; font-weight: 600; color: #e65100; margin-bottom: 8px;">
+                        🔍 Search Classrooms (e.g., hl102, hl205)
+                    </label>
+                    <input 
+                        id="classroomSearch" 
+                        type="text" 
+                        placeholder="Enter classroom names separated by commas (e.g., hl102, hl205, hl301)"
+                        style="width: 100%; padding: 10px 12px; border: 2px solid #ff9800; border-radius: 8px; font-size: 14px;"
+                    >
+                    <div style="margin-top: 8px; font-size: 0.85em; color: #666;">
+                        💡 Tip: You can search for multiple classrooms by separating them with commas
+                    </div>
+                </div>
+                <div id="classroomGridContainer"></div>
+            </div>
+            <div id="teacherSchedules">
+                <div class="search-filter-container" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 10px; border: 1px solid #667eea;">
+                    <label for="teacherSearch" style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 8px;">
+                        🔍 Search Instructors
+                    </label>
+                    <input 
+                        id="teacherSearch" 
+                        type="text" 
+                        placeholder="Enter instructor name to filter..."
+                        style="width: 100%; padding: 10px 12px; border: 2px solid #667eea; border-radius: 8px; font-size: 14px;"
+                    >
+                </div>
+                <div id="teacherCardsContainer"></div>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingSection" style="display: none;">
+            <div class="spinner"></div>
+            <p>Analyzing your schedule data...</p>
+        </div>
+    </div>
+
+    <script>
+        // All functionality is now handled by separate JavaScript modules
+        // The modules are loaded in the correct order and initialize automatically
+    </script>
+    <footer class="app-footer">© Amjad Al Kharusi</footer>
+</body>
+</html>
+
