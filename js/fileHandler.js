@@ -280,6 +280,9 @@ class FileHandler {
         if (window.rescheduleHelper) {
             window.rescheduleHelper.initialize(courses, classrooms, teachers);
         }
+        if (window.meetingFinder) {
+            window.meetingFinder.init(teachers);
+        }
 
         UTILS.hideLoading();
     }

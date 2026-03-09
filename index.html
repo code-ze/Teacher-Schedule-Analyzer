@@ -25,6 +25,7 @@
     <script src="js/rescheduleAutoAssign.js"></script>
     <script src="js/rescheduleHelper.js"></script>
     
+    <script src="js/meetingFinder.js"></script>
     <script src="js/pdfExporter.js"></script>
     <style>
         * {
@@ -2717,6 +2718,347 @@
             margin-bottom: 10px;
             display: block;
         }
+        /* ── Meeting Finder ─────────────────────────────────────── */
+        .meeting-finder-section {
+            background: linear-gradient(135deg, #f3e5f5, #fafafa);
+            border: 2px solid #9c27b0;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .mf-title {
+            font-size: 1.5em;
+            color: #6a1b9a;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* Search + controls bar */
+        .mf-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .mf-search-wrap {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .mf-search {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #ce93d8;
+            border-radius: 25px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .mf-search:focus { border-color: #9c27b0; }
+
+        .mf-btn-sm {
+            padding: 9px 18px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.87em;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .mf-btn-select-all {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #a5d6a7;
+        }
+
+        .mf-btn-select-all:hover { background: #c8e6c9; }
+
+        .mf-btn-clear {
+            background: #fce4ec;
+            color: #880e4f;
+            border: 1px solid #f48fb1;
+        }
+
+        .mf-btn-clear:hover { background: #f8bbd0; }
+
+        /* Instructor chip list */
+        .mf-instructor-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+            gap: 8px;
+            max-height: 260px;
+            overflow-y: auto;
+            padding: 12px;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e1bee7;
+            margin-bottom: 14px;
+        }
+
+        .mf-chip {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 9px 12px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.18s;
+            font-size: 0.88em;
+        }
+
+        .mf-chip:hover { border-color: #ce93d8; background: #f9f0ff; }
+
+        .mf-chip-selected {
+            border-color: #9c27b0;
+            background: #f3e5f5;
+        }
+
+        .mf-chip-check {
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            border: 2px solid #ccc;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #9c27b0;
+            flex-shrink: 0;
+            transition: all 0.18s;
+        }
+
+        .mf-chip-selected .mf-chip-check {
+            background: #9c27b0;
+            border-color: #9c27b0;
+            color: white;
+        }
+
+        .mf-chip-name {
+            flex: 1;
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .mf-chip-meta {
+            font-size: 0.78em;
+            color: #999;
+            white-space: nowrap;
+        }
+
+        .mf-no-match {
+            color: #999;
+            font-style: italic;
+            padding: 10px;
+            grid-column: 1 / -1;
+        }
+
+        /* Selected count */
+        .mf-count-hint {
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9em;
+            margin-bottom: 14px;
+        }
+
+        .mf-count-active {
+            text-align: center;
+            color: #6a1b9a;
+            font-weight: 600;
+            font-size: 0.95em;
+            margin-bottom: 14px;
+        }
+
+        /* Weekly grid */
+        .mf-table-scroll {
+            overflow-x: auto;
+            border-radius: 10px;
+            border: 1px solid #e1bee7;
+        }
+
+        .mf-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.88em;
+        }
+
+        .mf-th-time {
+            background: #6a1b9a;
+            color: white;
+            padding: 10px 14px;
+            text-align: left;
+            font-weight: 600;
+            min-width: 90px;
+            position: sticky;
+            left: 0;
+            z-index: 2;
+        }
+
+        .mf-th-day {
+            background: #6a1b9a;
+            color: white;
+            padding: 10px 12px;
+            text-align: center;
+            font-weight: 600;
+            min-width: 100px;
+        }
+
+        .mf-td-time {
+            background: #f5f5f5;
+            color: #555;
+            padding: 9px 14px;
+            font-weight: 600;
+            font-size: 0.9em;
+            white-space: nowrap;
+            border-bottom: 1px solid #eeeeee;
+            position: sticky;
+            left: 0;
+            z-index: 1;
+        }
+
+        .mf-td {
+            padding: 8px 10px;
+            text-align: center;
+            border-bottom: 1px solid #f0f0f0;
+            border-left: 1px solid #f0f0f0;
+            transition: opacity 0.15s;
+        }
+
+        .mf-td:hover { opacity: 0.85; }
+
+        .mf-td-label {
+            display: inline-block;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .mf-td-empty { background: #fafafa; color: #ccc; }
+
+        .mf-td-free {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .mf-td-free .mf-td-label { color: #2e7d32; }
+
+        .mf-td-busy {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .mf-td-busy .mf-td-label { color: #c62828; }
+
+        .mf-td-partial {
+            background: #fff8e1;
+            color: #e65100;
+        }
+
+        .mf-td-partial .mf-td-label { color: #e65100; }
+
+        /* Legend */
+        .mf-legend {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 12px 0 16px;
+            font-size: 0.82em;
+        }
+
+        .mf-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mf-legend-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .mf-legend-free  { background: #e8f5e9; border: 1px solid #a5d6a7; }
+        .mf-legend-busy  { background: #ffebee; border: 1px solid #ffcdd2; }
+        .mf-legend-part  { background: #fff8e1; border: 1px solid #ffecb3; }
+
+        /* Summary */
+        .mf-summary {
+            margin-top: 20px;
+        }
+
+        .mf-summary-empty {
+            text-align: center;
+            color: #e53935;
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 0.95em;
+        }
+
+        .mf-summary-title {
+            font-weight: 700;
+            color: #2e7d32;
+            font-size: 1.05em;
+            text-align: center;
+            margin-bottom: 14px;
+        }
+
+        .mf-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .mf-summary-day {
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #c8e6c9;
+            padding: 12px;
+        }
+
+        .mf-summary-day-name {
+            font-weight: 700;
+            color: #2e7d32;
+            margin-bottom: 8px;
+            font-size: 0.95em;
+            border-bottom: 1px solid #e8f5e9;
+            padding-bottom: 6px;
+        }
+
+        .mf-summary-slots {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .mf-summary-slot {
+            background: #4caf50;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.82em;
+            font-weight: 600;
+        }
+
+        .mf-summary-none {
+            color: #bbb;
+            font-style: italic;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -2765,6 +3107,53 @@
                 </div>
             </div>
             
+            <!-- Instructor Availability Meeting Finder -->
+            <div class="meeting-finder-section" id="meetingFinderSection" style="display:none;">
+                <div class="mf-title">🗓️ Find a Meeting Time</div>
+
+                <!-- Search + bulk controls -->
+                <div class="mf-controls">
+                    <div class="mf-search-wrap">
+                        <input id="mfSearch" class="mf-search" type="text"
+                               placeholder="Search instructors…">
+                    </div>
+                    <button class="mf-btn-sm mf-btn-select-all"
+                            onclick="meetingFinder.selectAll()">Select All</button>
+                    <button class="mf-btn-sm mf-btn-clear"
+                            onclick="meetingFinder.clearAll()">Clear</button>
+                </div>
+
+                <!-- Instructor chip grid -->
+                <div class="mf-instructor-list" id="mfInstructorList"></div>
+
+                <!-- Selection count -->
+                <div class="mf-count-hint" id="mfSelectedCount">
+                    Select instructors above to see common availability
+                </div>
+
+                <!-- Legend -->
+                <div class="mf-legend">
+                    <div class="mf-legend-item">
+                        <div class="mf-legend-dot mf-legend-free"></div>
+                        <span>All free</span>
+                    </div>
+                    <div class="mf-legend-item">
+                        <div class="mf-legend-dot mf-legend-part"></div>
+                        <span>Some free (X/Y)</span>
+                    </div>
+                    <div class="mf-legend-item">
+                        <div class="mf-legend-dot mf-legend-busy"></div>
+                        <span>All busy</span>
+                    </div>
+                </div>
+
+                <!-- Weekly availability grid -->
+                <div id="mfGridWrapper"></div>
+
+                <!-- Common free slots summary -->
+                <div class="mf-summary" id="mfSummary"></div>
+            </div>
+
             <!-- Conflict-Free Rescheduling Section -->
             <div class="reschedule-section" id="rescheduleSection" style="display: none;">
                 <div class="reschedule-title">🔄 Conflict-Free Course Rescheduler</div>
