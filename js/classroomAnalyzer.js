@@ -2,7 +2,8 @@
 class ClassroomAnalyzer {
     constructor() {
         this.classroomSection = document.getElementById('classroomSection');
-        this.classrooms = {}; // Store classrooms data for filtering
+        this.classrooms = {};
+        this.filteredClassrooms = []; // Tracks what is currently visible on screen
     }
 
     displayClassroomOccupancy(classrooms) {
@@ -106,6 +107,9 @@ class ClassroomAnalyzer {
     renderClassrooms(classroomArray) {
         // Sort by occupancy percentage (highest first)
         classroomArray.sort((a, b) => b.occupancyPercentage - a.occupancyPercentage);
+
+        // Keep a reference to whatever is currently on screen for export
+        this.filteredClassrooms = classroomArray;
 
         if (classroomArray.length === 0) {
             this.classroomGridContainer.innerHTML = `
