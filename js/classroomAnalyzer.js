@@ -45,6 +45,9 @@ class ClassroomAnalyzer {
                 <button class="export-pdf-btn" id="exportClassroomPdfBtn" onclick="exportClassroomPDF()">
                     📄 Export PDF
                 </button>
+                <button class="export-excel-btn" id="exportClassroomExcelBtn" onclick="exportClassroomExcel()">
+                    📊 Export Excel
+                </button>
             `;
             if (searchContainer) {
                 this.classroomSection.insertBefore(titleDiv, searchContainer);
