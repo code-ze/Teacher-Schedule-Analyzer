@@ -28,24 +28,25 @@ class ExcelExporter {
         }
     }
 
-    // Sheet 1: one row per classroom with daily hours breakdown
+    // Sheet 1: one row per classroom with daily occupancy percentages
     _addSummarySheet(wb, classroomArray) {
         const hours = this._getHours();
 
-        const dayHeaders = CONFIG.WORK_DAYS.map(d => `${d} (hrs)`);
+        const dayHeaders = CONFIG.WORK_DAYS.map(d => `${d} (%)`);
         const headers = ['Room', 'Occupancy %', 'Category', 'Total Classes', ...dayHeaders];
 
         const rows = classroomArray.map(classroom => {
-            const dailyHours = CONFIG.WORK_DAYS.map(day =>
-                hours.filter(h => classroom.schedule[day][h] && classroom.schedule[day][h].isOccupied).length
-            );
+            const dailyOccupancy = CONFIG.WORK_DAYS.map(day => {
+                const count = hours.filter(h => classroom.schedule[day][h] && classroom.schedule[day][h].isOccupied).length;
+                return parseFloat((count * 12.5).toFixed(1));
+            });
 
             return [
                 classroom.name,
                 parseFloat(classroom.occupancyPercentage),
                 this._capitalize(classroom.occupancyCategory),
                 classroom.totalClasses,
-                ...dailyHours
+                ...dailyOccupancy
             ];
         });
 
