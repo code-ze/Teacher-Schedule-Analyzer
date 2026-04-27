@@ -27,6 +27,7 @@
     
     <script src="js/meetingFinder.js"></script>
     <script src="js/pdfExporter.js"></script>
+    <script src="js/excelExporter.js"></script>
     <style>
         * {
             margin: 0;
@@ -285,6 +286,26 @@
         .export-pdf-btn:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+        }
+
+        .export-excel-btn {
+            background: linear-gradient(135deg, #43a047, #2e7d32);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .export-excel-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(67, 160, 71, 0.3);
         }
 
         .classroom-grid {
