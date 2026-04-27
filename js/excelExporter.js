@@ -10,15 +10,16 @@ class ExcelExporter {
 
     exportClassroomExcel() {
         try {
-            const classrooms = window.classroomAnalyzer && window.classroomAnalyzer.classrooms;
-            if (!classrooms || Object.keys(classrooms).length === 0) {
+            const analyzer = window.classroomAnalyzer;
+            const classroomArray = analyzer && analyzer.filteredClassrooms;
+            if (!classroomArray || classroomArray.length === 0) {
                 UTILS.showError('No classroom data available to export.');
                 return;
             }
 
             const wb = XLSX.utils.book_new();
-            this._addSummarySheet(wb, classrooms);
-            this._addScheduleSheet(wb, classrooms);
+            this._addSummarySheet(wb, classroomArray);
+            this._addScheduleSheet(wb, classroomArray);
 
             const date = new Date().toISOString().split('T')[0];
             XLSX.writeFile(wb, `classroom-occupancy-${date}.xlsx`);
@@ -28,14 +29,11 @@ class ExcelExporter {
     }
 
     // Sheet 1: one row per classroom with daily hours breakdown
-    _addSummarySheet(wb, classrooms) {
+    _addSummarySheet(wb, classroomArray) {
         const hours = this._getHours();
 
         const dayHeaders = CONFIG.WORK_DAYS.map(d => `${d} (hrs)`);
         const headers = ['Room', 'Occupancy %', 'Category', 'Total Classes', ...dayHeaders];
-
-        const classroomArray = Object.values(classrooms)
-            .sort((a, b) => parseFloat(b.occupancyPercentage) - parseFloat(a.occupancyPercentage));
 
         const rows = classroomArray.map(classroom => {
             const dailyHours = CONFIG.WORK_DAYS.map(day =>
@@ -65,14 +63,14 @@ class ExcelExporter {
     }
 
     // Sheet 2: one row per scheduled class across all rooms and days
-    _addScheduleSheet(wb, classrooms) {
+    _addScheduleSheet(wb, classroomArray) {
         const hours = this._getHours();
         const headers = ['Room', 'Day', 'Time Range', 'Course Code', 'Course Name', 'Lecturer', 'Section'];
 
-        const classroomArray = Object.values(classrooms).sort((a, b) => a.name.localeCompare(b.name));
+        const sorted = [...classroomArray].sort((a, b) => a.name.localeCompare(b.name));
 
         const rows = [];
-        classroomArray.forEach(classroom => {
+        sorted.forEach(classroom => {
             CONFIG.WORK_DAYS.forEach(day => {
                 const seen = new Set();
                 hours.forEach(hour => {
