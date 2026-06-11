@@ -74,10 +74,108 @@ class ClassroomAnalyzer {
         this.classroomSearch.parentNode.replaceChild(newSearch, this.classroomSearch);
         this.classroomSearch = newSearch;
 
-        // Add event listener for real-time filtering
         this.classroomSearch.addEventListener('input', () => {
             this.filterClassrooms();
         });
+
+        // Building search setup
+        const buildingSearchEl = document.getElementById('buildingSearch');
+        if (buildingSearchEl) {
+            const newBuildingSearch = buildingSearchEl.cloneNode(true);
+            buildingSearchEl.parentNode.replaceChild(newBuildingSearch, buildingSearchEl);
+            this.buildingSearch = newBuildingSearch;
+            this.buildingCoursesContainer = document.getElementById('buildingCoursesContainer');
+            this.buildingSearch.addEventListener('input', () => {
+                this.filterByBuilding();
+            });
+        }
+    }
+
+    filterByBuilding() {
+        if (!this.buildingCoursesContainer) return;
+
+        const prefix = (this.buildingSearch.value || '').trim().toLowerCase();
+
+        if (!prefix) {
+            this.buildingCoursesContainer.innerHTML = '';
+            return;
+        }
+
+        // Collect all unique courses from rooms whose name starts with the prefix
+        const courseMap = {}; // key: courseId+room -> {course, room, teacher, days}
+
+        Object.values(this.classrooms).forEach(classroom => {
+            if (!classroom.name.toLowerCase().startsWith(prefix)) return;
+
+            CONFIG.WORK_DAYS.forEach(day => {
+                for (let h = 6; h <= 20; h++) {
+                    const hourKey = h.toString().padStart(2, '0') + ':00';
+                    const slot = classroom.schedule[day][hourKey];
+                    if (!slot || !slot.isOccupied) continue;
+
+                    const courseId = slot.classId || (slot.course ? UTILS.extractClassId(slot.course) : '') || slot.course || '';
+                    const mapKey = `${courseId}||${classroom.name}`;
+
+                    if (!courseMap[mapKey]) {
+                        courseMap[mapKey] = {
+                            courseId,
+                            courseName: slot.course || '',
+                            room: classroom.name,
+                            teacher: slot.teacher || '',
+                            days: new Set(),
+                            timeRange: slot.timeRange || hourKey,
+                        };
+                    }
+                    courseMap[mapKey].days.add(day);
+                }
+            });
+        });
+
+        const courses = Object.values(courseMap);
+
+        if (courses.length === 0) {
+            this.buildingCoursesContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center; background: #f1f8e9; border-radius: 10px; margin-bottom: 20px; color: #555;">
+                    No courses found in building "<strong>${prefix.toUpperCase()}</strong>".
+                </div>`;
+            return;
+        }
+
+        // Sort by room then course
+        courses.sort((a, b) => a.room.localeCompare(b.room) || a.courseId.localeCompare(b.courseId));
+
+        const rows = courses.map(c => `
+            <tr>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600;">${c.courseId}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">${c.courseName}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">${c.room}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">${[...c.days].join(', ')}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">${c.timeRange}</td>
+                <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">${c.teacher}</td>
+            </tr>
+        `).join('');
+
+        this.buildingCoursesContainer.innerHTML = `
+            <div style="background: white; border-radius: 10px; border: 1px solid #4caf50; padding: 16px; margin-bottom: 20px;">
+                <div style="font-weight: 700; color: #2e7d32; font-size: 1.1em; margin-bottom: 12px;">
+                    🏢 Building <span style="text-transform: uppercase;">${prefix}</span> — ${courses.length} course(s) found
+                </div>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                        <thead>
+                            <tr style="background: #e8f5e9;">
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Course ID</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Course Name</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Room</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Days</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Time</th>
+                                <th style="padding: 10px 12px; text-align: left; color: #2e7d32;">Instructor</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
     }
 
     filterClassrooms() {
