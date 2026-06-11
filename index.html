@@ -3482,6 +3482,21 @@
                         💡 Tip: You can search for multiple classrooms by separating them with commas
                     </div>
                 </div>
+                <div class="search-filter-container" style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 10px; border: 1px solid #4caf50;">
+                    <label for="buildingSearch" style="display: block; font-weight: 600; color: #2e7d32; margin-bottom: 8px;">
+                        🏢 Search Courses by Building (enter first 2 letters, e.g., hl)
+                    </label>
+                    <input
+                        id="buildingSearch"
+                        type="text"
+                        placeholder="Enter building code (e.g., hl, ms, ab)..."
+                        style="width: 100%; padding: 10px 12px; border: 2px solid #4caf50; border-radius: 8px; font-size: 14px;"
+                    >
+                    <div style="margin-top: 8px; font-size: 0.85em; color: #666;">
+                        💡 Shows all courses held in rooms of that building
+                    </div>
+                </div>
+                <div id="buildingCoursesContainer"></div>
                 <div id="classroomGridContainer"></div>
             </div>
             <div id="teacherSchedules">
