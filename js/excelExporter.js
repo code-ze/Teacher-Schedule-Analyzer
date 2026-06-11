@@ -33,7 +33,7 @@ class ExcelExporter {
         const hours = this._getHours();
 
         const dayHeaders = CONFIG.WORK_DAYS.map(d => `${d} (%)`);
-        const headers = ['Room', 'Occupancy %', 'Category', 'Total Classes', ...dayHeaders];
+        const headers = ['Room', 'Occupancy %', 'Category', 'Total Classes', 'Departments', ...dayHeaders];
 
         const rows = classroomArray.map(classroom => {
             const dailyOccupancy = CONFIG.WORK_DAYS.map(day => {
@@ -46,6 +46,7 @@ class ExcelExporter {
                 parseFloat(classroom.occupancyPercentage),
                 this._capitalize(classroom.occupancyCategory),
                 classroom.totalClasses,
+                this._getDepartments(classroom).join(', '),
                 ...dailyOccupancy
             ];
         });
@@ -57,6 +58,7 @@ class ExcelExporter {
             { wch: 14 },
             { wch: 12 },
             { wch: 15 },
+            { wch: 32 },
             ...CONFIG.WORK_DAYS.map(() => ({ wch: 16 }))
         ];
 
@@ -66,7 +68,7 @@ class ExcelExporter {
     // Sheet 2: one row per scheduled class across all rooms and days
     _addScheduleSheet(wb, classroomArray) {
         const hours = this._getHours();
-        const headers = ['Room', 'Day', 'Time Range', 'Course Code', 'Course Name', 'Lecturer', 'Section'];
+        const headers = ['Room', 'Department', 'Day', 'Time Range', 'Course Code', 'Course Name', 'Lecturer', 'Section'];
 
         const sorted = [...classroomArray].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -85,6 +87,7 @@ class ExcelExporter {
 
                     rows.push([
                         classroom.name,
+                        slot.department || '',
                         day,
                         slot.timeRange || hour,
                         slot.classId || '',
@@ -100,6 +103,7 @@ class ExcelExporter {
 
         ws['!cols'] = [
             { wch: 12 },
+            { wch: 22 },
             { wch: 12 },
             { wch: 14 },
             { wch: 14 },
@@ -109,6 +113,15 @@ class ExcelExporter {
         ];
 
         XLSX.utils.book_append_sheet(wb, ws, 'Schedule Details');
+    }
+
+    // Normalize a classroom's departments (stored as a Set or array) to a sorted array
+    _getDepartments(classroom) {
+        if (!classroom.departments) return [];
+        const list = Array.isArray(classroom.departments)
+            ? classroom.departments
+            : Array.from(classroom.departments);
+        return list.filter(Boolean).sort((a, b) => a.localeCompare(b));
     }
 
     _getHours() {
