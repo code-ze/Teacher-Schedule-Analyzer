@@ -330,9 +330,25 @@ class ClassroomAnalyzer {
         return 'low';
     }
 
+    getDepartments(classroom) {
+        // departments may be stored as a Set (in-memory) or an array; normalize to a sorted array
+        if (!classroom.departments) return [];
+        const list = Array.isArray(classroom.departments)
+            ? classroom.departments
+            : Array.from(classroom.departments);
+        return list.filter(Boolean).sort((a, b) => a.localeCompare(b));
+    }
+
     createClassroomCard(classroom) {
         const occupancyClass = `occupancy-${classroom.occupancyCategory}`;
-        
+        const departments = this.getDepartments(classroom);
+        const departmentsHtml = departments.length
+            ? `<div class="classroom-departments">
+                    <span class="departments-label">🏛️ Departments using this room:</span>
+                    ${departments.map(d => `<span class="dept-chip">${d}</span>`).join('')}
+               </div>`
+            : '';
+
         return `
             <div class="classroom-card">
                 <div class="classroom-header" onclick="toggleClassroom('${classroom.name.replace(/'/g, "\\'")}')">
@@ -340,6 +356,7 @@ class ClassroomAnalyzer {
                     <div class="occupancy-badge ${occupancyClass}">${classroom.occupancyPercentage}%</div>
                 </div>
                 <div class="classroom-details" id="classroom-${classroom.name.replace(/[^a-zA-Z0-9]/g, '_')}">
+                    ${departmentsHtml}
                     <div class="occupancy-bar">
                         <div class="occupancy-fill ${occupancyClass}" style="width: ${Math.min(classroom.occupancyPercentage, 100)}%; background: ${this.getOccupancyColor(classroom.occupancyPercentage)};"></div>
                     </div>

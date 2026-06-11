@@ -84,8 +84,18 @@ class PDFExporter {
                 doc.setFontSize(CONFIG.PDF.FONT_SIZES.SMALL);
                 doc.setTextColor(100, 100, 100);
                 doc.text(`Occupancy: ${occupancy} (${category})`, CONFIG.PDF.MARGIN, yPosition + 8);
-                yPosition += 25;
-                
+
+                // List the departments using this room (if any)
+                const deptChips = card.querySelectorAll('.dept-chip');
+                if (deptChips.length > 0) {
+                    const deptNames = Array.from(deptChips).map(c => c.textContent.trim()).join(', ');
+                    const deptLines = doc.splitTextToSize(`Departments: ${deptNames}`, contentWidth);
+                    doc.text(deptLines, CONFIG.PDF.MARGIN, yPosition + 16);
+                    yPosition += 25 + (deptLines.length * 5);
+                } else {
+                    yPosition += 25;
+                }
+
                 // Get detailed schedule data
                 const details = card.querySelector('.classroom-details');
                 if (details) {

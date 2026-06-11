@@ -189,7 +189,8 @@ class FileHandler {
                         name: cleanRoom,
                         schedule: {},
                         totalHours: 0,
-                        totalClasses: 0
+                        totalClasses: 0,
+                        departments: new Set()
                     };
                     CONFIG.WORK_DAYS.forEach(day => {
                         classrooms[cleanRoom].schedule[day] = {};
@@ -255,6 +256,7 @@ class FileHandler {
                             teacher: cleanTeacher,
                             classId: UTILS.extractClassId(courseName),
                             section: section,
+                            department: departmentName || null,
                             timeRange: `${startTime}-${endTime}`
                         };
                     }
@@ -263,6 +265,9 @@ class FileHandler {
                 teachers[cleanTeacher].totalClasses++;
                 classrooms[cleanRoom].totalHours += classDuration;
                 classrooms[cleanRoom].totalClasses++;
+                if (departmentName) {
+                    classrooms[cleanRoom].departments.add(departmentName);
+                }
                 totalClasses++;
             }
         }
