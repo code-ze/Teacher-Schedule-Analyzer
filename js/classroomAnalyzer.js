@@ -4,6 +4,17 @@ class ClassroomAnalyzer {
         this.classroomSection = document.getElementById('classroomSection');
         this.classrooms = {};
         this.filteredClassrooms = []; // Tracks what is currently visible on screen
+        this.initBuildingSearch();
+    }
+
+    initBuildingSearch() {
+        this.buildingSearch = document.getElementById('buildingSearch');
+        this.buildingCoursesContainer = document.getElementById('buildingCoursesContainer');
+        if (this.buildingSearch) {
+            this.buildingSearch.addEventListener('input', () => {
+                this.filterByBuilding();
+            });
+        }
     }
 
     displayClassroomOccupancy(classrooms) {
@@ -66,6 +77,11 @@ class ClassroomAnalyzer {
         if (this.classroomGridContainer) {
             this.renderClassrooms(classroomArray);
         }
+
+        // Re-run building search in case the user typed a prefix before data loaded
+        if (this.buildingSearch && this.buildingSearch.value.trim()) {
+            this.filterByBuilding();
+        }
     }
 
     setupSearchFilter() {
@@ -77,18 +93,6 @@ class ClassroomAnalyzer {
         this.classroomSearch.addEventListener('input', () => {
             this.filterClassrooms();
         });
-
-        // Building search setup
-        const buildingSearchEl = document.getElementById('buildingSearch');
-        if (buildingSearchEl) {
-            const newBuildingSearch = buildingSearchEl.cloneNode(true);
-            buildingSearchEl.parentNode.replaceChild(newBuildingSearch, buildingSearchEl);
-            this.buildingSearch = newBuildingSearch;
-            this.buildingCoursesContainer = document.getElementById('buildingCoursesContainer');
-            this.buildingSearch.addEventListener('input', () => {
-                this.filterByBuilding();
-            });
-        }
     }
 
     filterByBuilding() {
@@ -101,6 +105,14 @@ class ClassroomAnalyzer {
             return;
         }
 
+        if (!this.classrooms || Object.keys(this.classrooms).length === 0) {
+            this.buildingCoursesContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center; background: #fff3e0; border-radius: 10px; margin-bottom: 20px; color: #e65100;">
+                    ⚠️ Please upload a schedule file first, then search by building.
+                </div>`;
+            return;
+        }
+
         // Collect all unique courses from rooms whose name starts with the prefix
         const courseMap = {}; // key: courseId+room -> {course, room, teacher, days}
 
@@ -108,6 +120,7 @@ class ClassroomAnalyzer {
             if (!classroom.name.toLowerCase().startsWith(prefix)) return;
 
             CONFIG.WORK_DAYS.forEach(day => {
+                if (!classroom.schedule[day]) return;
                 for (let h = 6; h <= 20; h++) {
                     const hourKey = h.toString().padStart(2, '0') + ':00';
                     const slot = classroom.schedule[day][hourKey];
@@ -144,6 +157,10 @@ class ClassroomAnalyzer {
         // Sort by room then course
         courses.sort((a, b) => a.room.localeCompare(b.room) || a.courseId.localeCompare(b.courseId));
 
+        // Keep results for export
+        this.buildingCourses = courses;
+        this.buildingPrefix = prefix;
+
         const rows = courses.map(c => `
             <tr>
                 <td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600;">${c.courseId}</td>
@@ -157,8 +174,12 @@ class ClassroomAnalyzer {
 
         this.buildingCoursesContainer.innerHTML = `
             <div style="background: white; border-radius: 10px; border: 1px solid #4caf50; padding: 16px; margin-bottom: 20px;">
-                <div style="font-weight: 700; color: #2e7d32; font-size: 1.1em; margin-bottom: 12px;">
-                    🏢 Building <span style="text-transform: uppercase;">${prefix}</span> — ${courses.length} course(s) found
+                <div style="font-weight: 700; color: #2e7d32; font-size: 1.1em; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                    <span>🏢 Building <span style="text-transform: uppercase;">${prefix}</span> — ${courses.length} course(s) found</span>
+                    <span>
+                        <button class="export-pdf-btn" onclick="exportBuildingPDF()">📄 Download PDF</button>
+                        <button class="export-excel-btn" onclick="exportBuildingExcel()">📊 Download Excel</button>
+                    </span>
                 </div>
                 <div style="overflow-x: auto;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
@@ -176,6 +197,84 @@ class ClassroomAnalyzer {
                     </table>
                 </div>
             </div>`;
+    }
+
+    exportBuildingPDF() {
+        if (!this.buildingCourses || this.buildingCourses.length === 0) {
+            UTILS.showError('No building report to export. Search for a building first.');
+            return;
+        }
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const building = this.buildingPrefix.toUpperCase();
+
+            doc.setFont('helvetica');
+            doc.setFontSize(18);
+            doc.setTextColor(40, 40, 40);
+            doc.text(`Building ${building} - Course Report`, 14, 20);
+
+            doc.setFontSize(10);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Generated on: ${new Date().toLocaleDateString()} | ${this.buildingCourses.length} course(s)`, 14, 28);
+
+            doc.autoTable({
+                startY: 35,
+                head: [['Course ID', 'Course Name', 'Room', 'Days', 'Time', 'Instructor']],
+                body: this.buildingCourses.map(c => [
+                    c.courseId,
+                    c.courseName,
+                    c.room,
+                    [...c.days].join(', '),
+                    c.timeRange,
+                    c.teacher
+                ]),
+                styles: { fontSize: 8, cellPadding: 2 },
+                headStyles: { fillColor: [46, 125, 50] },
+                alternateRowStyles: { fillColor: [241, 248, 233] }
+            });
+
+            const date = new Date().toISOString().split('T')[0];
+            doc.save(`building-${building}-courses-${date}.pdf`);
+        } catch (error) {
+            UTILS.showError('Failed to generate PDF: ' + error.message);
+        }
+    }
+
+    exportBuildingExcel() {
+        if (!this.buildingCourses || this.buildingCourses.length === 0) {
+            UTILS.showError('No building report to export. Search for a building first.');
+            return;
+        }
+        try {
+            const building = this.buildingPrefix.toUpperCase();
+            const headers = ['Course ID', 'Course Name', 'Room', 'Days', 'Time', 'Instructor'];
+            const rows = this.buildingCourses.map(c => [
+                c.courseId,
+                c.courseName,
+                c.room,
+                [...c.days].join(', '),
+                c.timeRange,
+                c.teacher
+            ]);
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+            ws['!cols'] = [
+                { wch: 14 },
+                { wch: 42 },
+                { wch: 12 },
+                { wch: 28 },
+                { wch: 14 },
+                { wch: 28 }
+            ];
+            XLSX.utils.book_append_sheet(wb, ws, `Building ${building}`);
+
+            const date = new Date().toISOString().split('T')[0];
+            XLSX.writeFile(wb, `building-${building}-courses-${date}.xlsx`);
+        } catch (error) {
+            UTILS.showError('Failed to generate Excel: ' + error.message);
+        }
     }
 
     filterClassrooms() {
@@ -312,6 +411,15 @@ class ClassroomAnalyzer {
         if (percentage >= 40) return '#f57c00';
         return '#388e3c';
     }
+}
+
+// Global functions for building report export buttons (called from HTML)
+function exportBuildingPDF() {
+    if (window.classroomAnalyzer) window.classroomAnalyzer.exportBuildingPDF();
+}
+
+function exportBuildingExcel() {
+    if (window.classroomAnalyzer) window.classroomAnalyzer.exportBuildingExcel();
 }
 
 // Global function for toggling classroom (called from HTML)
