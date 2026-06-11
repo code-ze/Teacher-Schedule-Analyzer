@@ -4,6 +4,17 @@ class ClassroomAnalyzer {
         this.classroomSection = document.getElementById('classroomSection');
         this.classrooms = {};
         this.filteredClassrooms = []; // Tracks what is currently visible on screen
+        this.initBuildingSearch();
+    }
+
+    initBuildingSearch() {
+        this.buildingSearch = document.getElementById('buildingSearch');
+        this.buildingCoursesContainer = document.getElementById('buildingCoursesContainer');
+        if (this.buildingSearch) {
+            this.buildingSearch.addEventListener('input', () => {
+                this.filterByBuilding();
+            });
+        }
     }
 
     displayClassroomOccupancy(classrooms) {
@@ -66,6 +77,11 @@ class ClassroomAnalyzer {
         if (this.classroomGridContainer) {
             this.renderClassrooms(classroomArray);
         }
+
+        // Re-run building search in case the user typed a prefix before data loaded
+        if (this.buildingSearch && this.buildingSearch.value.trim()) {
+            this.filterByBuilding();
+        }
     }
 
     setupSearchFilter() {
@@ -77,18 +93,6 @@ class ClassroomAnalyzer {
         this.classroomSearch.addEventListener('input', () => {
             this.filterClassrooms();
         });
-
-        // Building search setup
-        const buildingSearchEl = document.getElementById('buildingSearch');
-        if (buildingSearchEl) {
-            const newBuildingSearch = buildingSearchEl.cloneNode(true);
-            buildingSearchEl.parentNode.replaceChild(newBuildingSearch, buildingSearchEl);
-            this.buildingSearch = newBuildingSearch;
-            this.buildingCoursesContainer = document.getElementById('buildingCoursesContainer');
-            this.buildingSearch.addEventListener('input', () => {
-                this.filterByBuilding();
-            });
-        }
     }
 
     filterByBuilding() {
@@ -101,6 +105,14 @@ class ClassroomAnalyzer {
             return;
         }
 
+        if (!this.classrooms || Object.keys(this.classrooms).length === 0) {
+            this.buildingCoursesContainer.innerHTML = `
+                <div style="padding: 20px; text-align: center; background: #fff3e0; border-radius: 10px; margin-bottom: 20px; color: #e65100;">
+                    ⚠️ Please upload a schedule file first, then search by building.
+                </div>`;
+            return;
+        }
+
         // Collect all unique courses from rooms whose name starts with the prefix
         const courseMap = {}; // key: courseId+room -> {course, room, teacher, days}
 
@@ -108,6 +120,7 @@ class ClassroomAnalyzer {
             if (!classroom.name.toLowerCase().startsWith(prefix)) return;
 
             CONFIG.WORK_DAYS.forEach(day => {
+                if (!classroom.schedule[day]) return;
                 for (let h = 6; h <= 20; h++) {
                     const hourKey = h.toString().padStart(2, '0') + ':00';
                     const slot = classroom.schedule[day][hourKey];
