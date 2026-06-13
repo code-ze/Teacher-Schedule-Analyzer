@@ -24,7 +24,7 @@ class RescheduleReport {
         };
         
         this.hours = ['08', '09', '10', '11', '12', '13', '14', '15', '16', '17'];
-        this.days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'];
+        this.days = CONFIG.WORK_DAYS;
     }
 
     initialize(core) {
