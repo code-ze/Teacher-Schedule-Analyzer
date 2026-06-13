@@ -2,7 +2,7 @@
 const CONFIG = {
     // Working hours and days configuration
     WORK_HOURS: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'],
-    WORK_DAYS: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+    WORK_DAYS: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
     
     // Full occupancy is 8am to 4pm (8 hours = 100%)
     FULL_OCCUPANCY_HOURS: 8, // 08:00 to 16:00
