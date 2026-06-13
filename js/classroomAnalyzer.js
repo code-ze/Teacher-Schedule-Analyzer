@@ -33,7 +33,7 @@ class ClassroomAnalyzer {
             // Check each day to find the maximum hours used in a single day
             CONFIG.WORK_DAYS.forEach(day => {
                 let dailyHours = 0;
-                for (let h = 6; h <= 20; h++) {
+                for (let h = 6; h <= 21; h++) {
                     const hourKey = h.toString().padStart(2, '0') + ':00';
                     if (classroom.schedule[day][hourKey] && classroom.schedule[day][hourKey].isOccupied) {
                         dailyHours++;
@@ -121,7 +121,7 @@ class ClassroomAnalyzer {
 
             CONFIG.WORK_DAYS.forEach(day => {
                 if (!classroom.schedule[day]) return;
-                for (let h = 6; h <= 20; h++) {
+                for (let h = 6; h <= 21; h++) {
                     const hourKey = h.toString().padStart(2, '0') + ':00';
                     const slot = classroom.schedule[day][hourKey];
                     if (!slot || !slot.isOccupied) continue;
@@ -365,7 +365,7 @@ class ClassroomAnalyzer {
                         <div class="stat-box">
                             <div class="stat-value">${Math.max(...CONFIG.WORK_DAYS.map(day => {
                                 let dailyHours = 0;
-                                for (let h = 6; h <= 20; h++) {
+                                for (let h = 6; h <= 21; h++) {
                                     const hourKey = h.toString().padStart(2, '0') + ':00';
                                     if (classroom.schedule[day][hourKey] && classroom.schedule[day][hourKey].isOccupied) {
                                         dailyHours++;
@@ -392,7 +392,7 @@ class ClassroomAnalyzer {
     createDaySchedule(classroom, day) {
         const daySchedule = classroom.schedule[day];
         // Show hours from 6am to 8pm to capture all possible class times
-        const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+        const hours = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
         
         // Calculate daily occupancy percentage
         let dailyHours = 0;
