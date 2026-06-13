@@ -194,7 +194,7 @@ class FileHandler {
                     };
                     CONFIG.WORK_DAYS.forEach(day => {
                         classrooms[cleanRoom].schedule[day] = {};
-                        for (let h = 6; h <= 20; h++) {
+                        for (let h = 6; h <= 21; h++) {
                             const hourKey = h.toString().padStart(2, '0') + ':00';
                             classrooms[cleanRoom].schedule[day][hourKey] = {
                                 isOccupied: false,
