@@ -8,7 +8,7 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
-  padding: 20px;
+  padding: 20px 20px 40px; /* bottom room for the fixed footer */
 }
 
 .container {
@@ -218,12 +218,18 @@ body {
 }
 
 .app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
   text-align: center;
+  background: rgba(44, 62, 80, 0.95);
   color: #ffffff;
-  font-weight: 700;
-  font-size: 12px;
-  padding: 16px 0;
-  margin-top: 24px;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 20px;
+  height: 20px;
 }
 
 .loading {
