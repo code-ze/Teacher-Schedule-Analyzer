@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -37,5 +38,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # While Pages is still set to "Deploy from a branch", GitHub also runs its
+      # own "pages build and deployment" job on every push, which publishes the
+      # unbuilt sources. Wait for it so our built site is the one left live.
+      - name: Wait for legacy branch Pages build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 36); do
+            status=$(gh api "repos/${{ github.repository }}/actions/runs?head_sha=${{ github.sha }}" \
+              --jq '[.workflow_runs[] | select(.name == "pages build and deployment")][0].status // "none"')
+            echo "legacy pages build: $status"
+            if [ "$status" = "completed" ]; then break; fi
+            if [ "$status" = "none" ] && [ "$i" -ge 6 ]; then break; fi
+            sleep 10
+          done
       - id: deployment
         uses: actions/deploy-pages@v4
