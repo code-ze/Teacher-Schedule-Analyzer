@@ -27,23 +27,26 @@ describe('ClassroomsSection with the real CollegeTimeTable data', () => {
     render(<ClassroomsSection classrooms={classrooms} />);
 
     // The department utilization panel lists every department found in the file.
-    expect(screen.getByText('🏛️ Department Room Utilization')).toBeTruthy();
+    expect(screen.getByText('Department room utilization')).toBeTruthy();
     const deptCardNames = Array.from(document.querySelectorAll('.department-card-name')).map((el) => el.textContent);
     expect(deptCardNames).toContain('Business Studies');
     expect(deptCardNames).toContain('Information Technology');
 
-    // The classroom grid starts unfiltered: every room from the data set is present.
+    // The classroom grid starts unfiltered (and paged): every room is counted.
     const totalRoomCount = Object.keys(classrooms).length;
+    expect(screen.getByText(`${totalRoomCount} rooms found`)).toBeTruthy();
     const initialCards = document.querySelectorAll('.classroom-card');
-    expect(initialCards.length).toBe(totalRoomCount);
+    expect(initialCards.length).toBe(Math.min(totalRoomCount, 30));
 
     // Ticking a department in the filter narrows the room grid down to
     // only the rooms that department actually uses.
     fireEvent.click(screen.getByRole('checkbox', { name: 'Business Studies' }));
 
+    const bsRooms = Object.values(classrooms).filter((c) => c.departments.has('Business Studies')).length;
+    expect(bsRooms).toBeLessThan(totalRoomCount);
+    expect(screen.getByText(`${bsRooms} rooms found`)).toBeTruthy();
     const filteredCards = document.querySelectorAll('.classroom-card');
-    expect(filteredCards.length).toBeGreaterThan(0);
-    expect(filteredCards.length).toBeLessThan(totalRoomCount);
+    expect(filteredCards.length).toBe(Math.min(bsRooms, 30));
 
     Array.from(filteredCards).forEach((card) => {
       const name = card.querySelector('.classroom-name')?.textContent;

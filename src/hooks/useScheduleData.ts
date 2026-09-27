@@ -7,6 +7,7 @@ interface UseScheduleDataResult {
   data: ProcessedData | null;
   loading: boolean;
   error: string | null;
+  fileNames: string[];
   loadFiles: (files: FileList | File[]) => Promise<void>;
 }
 
@@ -14,12 +15,14 @@ export function useScheduleData(): UseScheduleDataResult {
   const [data, setData] = useState<ProcessedData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fileNames, setFileNames] = useState<string[]>([]);
 
   const loadFiles = useCallback(async (files: FileList | File[]) => {
     if (!files || (Array.isArray(files) ? files.length === 0 : files.length === 0)) {
       setError('Please select at least one CSV or Excel file.');
       return;
     }
+    const names = Array.from(files).map((f) => f.name);
     setLoading(true);
     setError(null);
     try {
@@ -31,6 +34,7 @@ export function useScheduleData(): UseScheduleDataResult {
         );
       }
       setData(processed);
+      setFileNames(names);
     } catch (err) {
       setError('Error processing the data: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -38,5 +42,5 @@ export function useScheduleData(): UseScheduleDataResult {
     }
   }, []);
 
-  return { data, loading, error, loadFiles };
+  return { data, loading, error, fileNames, loadFiles };
 }

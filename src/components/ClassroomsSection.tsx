@@ -12,6 +12,8 @@ import {
   type BuildingCourseRow
 } from '../utils/exporters';
 
+const ROOM_PAGE_SIZE = 30;
+
 function occupancyCategory(pct: number): 'high' | 'medium' | 'low' {
   if (pct >= 75) return 'high';
   if (pct >= 40) return 'medium';
@@ -45,13 +47,22 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
   const pct = classroom.occupancyPercentage ?? 0;
 
   return (
-    <div className="classroom-card">
-      <div className="classroom-header" onClick={() => setOpen((o) => !o)}>
-        <div className="classroom-name">{classroom.name}</div>
-        <div className={`occupancy-badge occupancy-${classroom.occupancyCategory}`}>{pct}%</div>
-      </div>
+    <div className={`classroom-card${open ? ' open' : ''}`}>
+      <button className="classroom-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="classroom-name">{classroom.name}</span>
+        <span className={`occupancy-badge occupancy-${classroom.occupancyCategory}`}>{pct}%</span>
+        <span className="classroom-summary">
+          {classroom.totalClasses} classes · {departments.join(', ') || 'No department'}
+        </span>
+        <span className="occupancy-bar">
+          <span
+            className="occupancy-fill"
+            style={{ width: `${Math.min(pct, 100)}%`, background: occupancyColor(pct) }}
+          />
+        </span>
+      </button>
       {open && (
-        <div className="classroom-details expanded">
+        <div className="classroom-details">
           {departments.length > 0 && (
             <div className="classroom-departments">
               <span className="departments-label">🏛️ Departments using this room:</span>
@@ -62,13 +73,6 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
               ))}
             </div>
           )}
-
-          <div className="occupancy-bar">
-            <div
-              className="occupancy-fill"
-              style={{ width: `${Math.min(pct, 100)}%`, background: occupancyColor(pct) }}
-            />
-          </div>
 
           <div className="occupancy-stats">
             <div className="stat-box">
@@ -193,180 +197,183 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
   }, [classrooms, buildingSearch]);
 
   const buildingPrefix = buildingSearch.trim();
+  const [limit, setLimit] = useState(ROOM_PAGE_SIZE);
+  const visibleRooms = filteredClassrooms.slice(0, limit);
 
   return (
     <>
-      <div className="department-utilization-section">
-        <div className="department-utilization-title">
-          🏛️ Department Room Utilization
+      <section className="panel department-utilization-section">
+        <div className="panel-header">
+          <div>
+            <h2>Department room utilization</h2>
+            <p className="panel-sub">
+              Average use of each department's rooms (8 hours a day = 100%). Click cards to filter the rooms below —
+              you can pick several.
+            </p>
+          </div>
           {departmentStats.length > 0 && (
-            <>
+            <div className="panel-actions">
               <button className="export-pdf-btn" onClick={() => exportDepartmentUtilizationPDF(exportedStats)}>
-                📄 Export PDF
+                📄 PDF
               </button>
               <button className="export-excel-btn" onClick={() => exportDepartmentUtilizationExcel(exportedStats)}>
-                📊 Export Excel
+                📊 Excel
               </button>
-            </>
+            </div>
           )}
         </div>
         {departmentStats.length === 0 ? (
-          <div className="no-common-time">No department data found in this file.</div>
+          <div className="empty-state">No department data found in this file.</div>
         ) : (
           <div className="department-utilization-grid">
             {departmentStats.map((dept) => (
-              <div
+              <button
                 key={dept.name}
                 className={`department-card${selectedDepts.includes(dept.name) ? ' active' : ''}`}
-                onClick={() => toggleDept(dept.name)}
+                aria-pressed={selectedDepts.includes(dept.name)}
+                onClick={() => {
+                  toggleDept(dept.name);
+                  setLimit(ROOM_PAGE_SIZE);
+                }}
                 title="Click to select or unselect this department (you can pick several)"
               >
-                <div className="department-card-name">{dept.name}</div>
-                <div className="occupancy-bar">
-                  <div
+                <span className="department-card-top">
+                  <span className="department-card-name">{dept.name}</span>
+                  <span className="department-card-pct" style={{ color: occupancyColor(dept.utilizationPercentage) }}>
+                    {dept.utilizationPercentage}%
+                  </span>
+                </span>
+                <span className="occupancy-bar">
+                  <span
                     className="occupancy-fill"
                     style={{
                       width: `${Math.min(dept.utilizationPercentage, 100)}%`,
                       background: occupancyColor(dept.utilizationPercentage)
                     }}
                   />
-                </div>
-                <div className="department-card-meta">
-                  <span>{dept.utilizationPercentage}% avg room use</span>
-                  <span>{dept.maxDailyHours} room-hrs on busiest day</span>
-                  <span>{dept.totalClasses} sections/wk</span>
-                  <span>{dept.teacherCount} instructors</span>
+                </span>
+                <span className="department-card-meta">
                   <span>{dept.roomCount} rooms</span>
-                </div>
-              </div>
+                  <span>{dept.totalClasses} classes/wk</span>
+                  <span>{dept.teacherCount} instructors</span>
+                  <span>{dept.maxDailyHours} room-hrs busiest day</span>
+                </span>
+              </button>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="classroom-occupancy-section" id="classroomSection">
-        <div className="classroom-title">
-          📚 Classroom Occupancy Analysis
-          <button className="export-pdf-btn" onClick={() => exportClassroomsPDF(filteredClassrooms)}>
-            📄 Export PDF
-          </button>
-          <button className="export-excel-btn" onClick={() => exportClassroomsExcel(filteredClassrooms)}>
-            📊 Export Excel
-          </button>
+      <section className="panel classroom-occupancy-section" id="classroomSection">
+        <div className="panel-header">
+          <div>
+            <h2>Rooms</h2>
+            <p className="panel-sub">
+              Busiest day per room (1 hour = 12.5%). Click a room to see its week.
+            </p>
+          </div>
+          <div className="panel-actions">
+            <button className="export-pdf-btn" onClick={() => exportClassroomsPDF(filteredClassrooms)}>
+              📄 PDF
+            </button>
+            <button className="export-excel-btn" onClick={() => exportClassroomsExcel(filteredClassrooms)}>
+              📊 Excel
+            </button>
+          </div>
         </div>
 
-        <div className="search-filter-container" style={{ border: '1px solid #7e57c2' }}>
-          <label style={{ display: 'block', fontWeight: 600, color: '#4527a0', marginBottom: 8 }}>
-            🏛️ Filter by Department (pick one or more)
-          </label>
+        <div className="filter-block">
+          <div className="filter-label">Departments</div>
           <div className="department-report-picker">
             {departmentStats.map((d) => (
               <label key={d.name} className={`department-report-chip${selectedDepts.includes(d.name) ? ' selected' : ''}`}>
-                <input type="checkbox" checked={selectedDepts.includes(d.name)} onChange={() => toggleDept(d.name)} />
+                <input
+                  type="checkbox"
+                  checked={selectedDepts.includes(d.name)}
+                  onChange={() => {
+                    toggleDept(d.name);
+                    setLimit(ROOM_PAGE_SIZE);
+                  }}
+                />
                 {d.name}
               </label>
             ))}
             {selectedDepts.length > 0 && (
-              <button className="btn" onClick={() => setSelectedDepts([])} style={{ padding: '8px 18px' }}>
+              <button className="btn-link" onClick={() => setSelectedDepts([])}>
                 Clear filter
               </button>
             )}
           </div>
-          <div style={{ marginTop: 6, fontSize: '0.85em', color: '#666' }}>
-            💡 Tick one or more departments (or click the cards above) to show only the rooms they use
-          </div>
         </div>
 
-        <div className="search-filter-container" style={{ border: '1px solid #ff9800' }}>
-          <label htmlFor="classroomSearch" style={{ display: 'block', fontWeight: 600, color: '#e65100', marginBottom: 8 }}>
-            🔍 Search Classrooms (e.g., hl102, hl205)
-          </label>
+        <div className="toolbar">
           <input
             id="classroomSearch"
-            type="text"
-            placeholder="Enter classroom names separated by commas (e.g., hl102, hl205, hl301)"
-            style={{ width: '100%', padding: '10px 12px', border: '2px solid #ff9800', borderRadius: 8, fontSize: 14 }}
+            type="search"
+            className="grow"
+            aria-label="Search rooms"
+            placeholder="🔍 Rooms, e.g. hl102, hl205 (comma-separated)"
             value={roomSearch}
-            onChange={(e) => setRoomSearch(e.target.value)}
+            onChange={(e) => {
+              setRoomSearch(e.target.value);
+              setLimit(ROOM_PAGE_SIZE);
+            }}
           />
-          <div style={{ marginTop: 8, fontSize: '0.85em', color: '#666' }}>
-            💡 Tip: You can search for multiple classrooms by separating them with commas
-          </div>
-        </div>
-
-        <div className="search-filter-container" style={{ border: '1px solid #4caf50' }}>
-          <label htmlFor="buildingSearch" style={{ display: 'block', fontWeight: 600, color: '#2e7d32', marginBottom: 8 }}>
-            🏢 Search Courses by Building (enter first 2 letters, e.g., hl)
-          </label>
           <input
             id="buildingSearch"
-            type="text"
-            placeholder="Enter building code (e.g., hl, ms, ab)..."
-            style={{ width: '100%', padding: '10px 12px', border: '2px solid #4caf50', borderRadius: 8, fontSize: 14 }}
+            type="search"
+            className="building-input"
+            aria-label="Building code"
+            placeholder="🏢 Building code, e.g. hl"
             value={buildingSearch}
             onChange={(e) => setBuildingSearch(e.target.value)}
           />
-          <div style={{ marginTop: 8, fontSize: '0.85em', color: '#666' }}>
-            💡 Shows all courses held in rooms of that building
-          </div>
+          <span className="muted">{filteredClassrooms.length} rooms found</span>
         </div>
 
         {buildingPrefix && (
-          <div style={{ background: 'white', borderRadius: 10, border: '1px solid #4caf50', padding: 16, marginBottom: 20 }}>
-            <div
-              style={{
-                fontWeight: 700,
-                color: '#2e7d32',
-                fontSize: '1.1em',
-                marginBottom: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 8
-              }}
-            >
-              <span>
-                🏢 Building <span style={{ textTransform: 'uppercase' }}>{buildingPrefix}</span> — {buildingResults.length}{' '}
-                course(s) found
-              </span>
+          <div className="subpanel">
+            <div className="subpanel-header">
+              <strong>
+                🏢 Building <span className="upper">{buildingPrefix}</span> · {buildingResults.length} course(s)
+              </strong>
               {buildingResults.length > 0 && (
-                <span>
+                <span className="panel-actions">
                   <button className="export-pdf-btn" onClick={() => exportBuildingPDF(buildingPrefix, buildingResults)}>
-                    📄 Download PDF
-                  </button>{' '}
+                    📄 PDF
+                  </button>
                   <button className="export-excel-btn" onClick={() => exportBuildingExcel(buildingPrefix, buildingResults)}>
-                    📊 Download Excel
+                    📊 Excel
                   </button>
                 </span>
               )}
             </div>
             {buildingResults.length === 0 ? (
-              <div style={{ padding: 20, textAlign: 'center', color: '#555' }}>
-                No courses found in building "<strong>{buildingPrefix.toUpperCase()}</strong>".
+              <div className="empty-state">
+                No courses found in building “<strong className="upper">{buildingPrefix}</strong>”.
               </div>
             ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+              <div className="table-scroll">
+                <table className="data-table">
                   <thead>
-                    <tr style={{ background: '#e8f5e9' }}>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Course ID</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Course Name</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Room</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Days</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Time</th>
-                      <th style={{ padding: '10px 12px', textAlign: 'left', color: '#2e7d32' }}>Instructor</th>
+                    <tr>
+                      <th>Course</th>
+                      <th>Course name</th>
+                      <th>Room</th>
+                      <th>Days</th>
+                      <th>Time</th>
+                      <th>Instructor</th>
                     </tr>
                   </thead>
                   <tbody>
                     {buildingResults.map((c, i) => (
                       <tr key={i}>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0', fontWeight: 600 }}>{c.courseId}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>{c.courseName}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>{c.room}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>{c.days.join(', ')}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>{c.timeRange}</td>
-                        <td style={{ padding: '8px 12px', borderBottom: '1px solid #e0e0e0' }}>{c.teacher}</td>
+                        <td className="strong">{c.courseId}</td>
+                        <td>{c.courseName}</td>
+                        <td>{c.room}</td>
+                        <td>{c.days.join(', ')}</td>
+                        <td>{c.timeRange}</td>
+                        <td>{c.teacher}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -377,17 +384,22 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
         )}
 
         {filteredClassrooms.length === 0 ? (
-          <div className="no-common-time" style={{ textAlign: 'center', padding: 20 }}>
-            No classrooms found matching your search criteria.
-          </div>
+          <div className="empty-state">No rooms match your search.</div>
         ) : (
           <div className="classroom-grid">
-            {filteredClassrooms.map((classroom) => (
+            {visibleRooms.map((classroom) => (
               <ClassroomCard classroom={classroom} key={classroom.name} />
             ))}
           </div>
         )}
-      </div>
+        {filteredClassrooms.length > limit && (
+          <div className="show-more">
+            <button className="btn-outline" onClick={() => setLimit((l) => l + ROOM_PAGE_SIZE * 2)}>
+              Show more ({filteredClassrooms.length - limit} more)
+            </button>
+          </div>
+        )}
+      </section>
     </>
   );
 }

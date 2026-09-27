@@ -45,39 +45,42 @@ export default function DepartmentReportSection({ courses, departments }: Props)
   const who = single ? selected[0] : 'The selected departments';
 
   return (
-    <div className="department-utilization-section department-report-section">
-      <div className="department-utilization-title">
-        📑 Department Room Report
+    <section className="panel department-report-section">
+      <div className="panel-header">
+        <div>
+          <h2>Department room report</h2>
+          <p className="panel-sub">Pick one or more departments, then download a shareable PDF or Excel report.</p>
+        </div>
         {report && report.meetings.length > 0 && (
-          <>
+          <div className="panel-actions">
             <button className="export-pdf-btn" onClick={() => exportDepartmentReportPDF(report)}>
               📄 Download PDF
             </button>
             <button className="export-excel-btn" onClick={() => exportDepartmentReportExcel(report)}>
               📊 Download Excel
             </button>
-          </>
+          </div>
         )}
       </div>
 
       <div className="department-report-picker">
-        <span className="department-report-picker-label">Departments in the report:</span>
+        <span className="filter-label">Departments</span>
         {departments.map((d) => (
           <label key={d} className={`department-report-chip${selected.includes(d) ? ' selected' : ''}`}>
             <input type="checkbox" checked={selected.includes(d)} onChange={() => toggle(d)} />
             {d}
           </label>
         ))}
-        <button className="mf-btn-sm mf-btn-select-all" onClick={() => setSelected(departments)}>
+        <button className="btn-link" onClick={() => setSelected(departments)}>
           Select all
         </button>
-        <button className="mf-btn-sm mf-btn-clear" onClick={() => setSelected([])}>
+        <button className="btn-link" onClick={() => setSelected([])}>
           Clear
         </button>
       </div>
 
       {!report || !s ? (
-        <div className="no-common-time">Select at least one department.</div>
+        <div className="empty-state">Select at least one department.</div>
       ) : (
         <>
           <p className="department-report-headline">
@@ -93,8 +96,8 @@ export default function DepartmentReportSection({ courses, departments }: Props)
             other departments' classes in these rooms, a weekly timetable per room and instructor loads.
           </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table className="department-report-table">
+          <div className="table-scroll">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Department</th>
@@ -110,7 +113,7 @@ export default function DepartmentReportSection({ courses, departments }: Props)
               <tbody>
                 {report.byDepartment.map((d) => (
                   <tr key={d.department}>
-                    <td style={{ fontWeight: 600 }}>{d.department}</td>
+                    <td className="strong">{d.department}</td>
                     <td>{d.weeklyClasses}</td>
                     <td>{d.weeklyHours}</td>
                     <td>{d.rooms}</td>
@@ -144,8 +147,8 @@ export default function DepartmentReportSection({ courses, departments }: Props)
             ))}
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table className="department-report-table">
+          <div className="table-scroll">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th>Room</th>
@@ -158,7 +161,7 @@ export default function DepartmentReportSection({ courses, departments }: Props)
               <tbody>
                 {report.rooms.map((r) => (
                   <tr key={r.room}>
-                    <td style={{ fontWeight: 600 }}>{r.room}</td>
+                    <td className="strong">{r.room}</td>
                     <td>{single ? r.selectedHours : hoursText(r.hoursByDepartment)}</td>
                     <td>{r.sharedWith.length === 0 ? '–' : hoursText(r.otherHours)}</td>
                     <td>{r.freeHours}</td>
@@ -170,6 +173,6 @@ export default function DepartmentReportSection({ courses, departments }: Props)
           </div>
         </>
       )}
-    </div>
+    </section>
   );
 }
