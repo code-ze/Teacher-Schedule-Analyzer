@@ -1,7 +1,9 @@
 import { WORK_DAYS, DISPLAY_HOURS, extractClassId } from '../config';
 import type { RawRow, Teacher, Classroom, CourseSection, ProcessedData } from '../types';
 
-const SLOT_PATTERN = /(\d{2}:\d{2})-(\d{2}:\d{2})\s*-\s*([^\\]+)\\(.+)/;
+// One "HH:MM-HH:MM - ROOM\\Teacher" entry. A day cell can hold several of these
+// back to back (e.g. two meetings on the same day), so match them all.
+const SLOT_PATTERN = /(\d{2}:\d{2})-(\d{2}:\d{2})\s*-\s*([^\\]+?)\\(.+?)(?=\s+\d{2}:\d{2}-\d{2}:\d{2}\s*-|\s*$)/g;
 
 function normalizeRow(rawRow: RawRow): RawRow | null {
   if (!rawRow) return null;
@@ -50,105 +52,104 @@ export function processScheduleData(data: RawRow[]): ProcessedData {
         continue;
       }
 
-      const match = String(dayData).match(SLOT_PATTERN);
-      if (!match) continue;
+      for (const match of String(dayData).matchAll(SLOT_PATTERN)) {
+        const [, startTime, endTime, room, teacher] = match;
+        const cleanTeacher = String(teacher).trim();
+        const cleanRoom = String(room).trim();
 
-      const [, startTime, endTime, room, teacher] = match;
-      const cleanTeacher = String(teacher).trim();
-      const cleanRoom = String(room).trim();
-
-      if (!teachers[cleanTeacher]) {
-        teachers[cleanTeacher] = {
-          name: cleanTeacher,
-          department: departmentName,
-          schedule: {},
-          totalClasses: 0
-        };
-        WORK_DAYS.forEach((day) => {
-          teachers[cleanTeacher].schedule[day] = {};
-        });
-      }
-
-      if (!classrooms[cleanRoom]) {
-        classrooms[cleanRoom] = {
-          name: cleanRoom,
-          schedule: {},
-          totalHours: 0,
-          totalClasses: 0,
-          departments: new Set<string>()
-        };
-        WORK_DAYS.forEach((day) => {
-          classrooms[cleanRoom].schedule[day] = {};
-          DISPLAY_HOURS.forEach((hourKey) => {
-            classrooms[cleanRoom].schedule[day][hourKey] = {
-              isOccupied: false,
-              course: null,
-              teacher: null
-            };
-          });
-        });
-      }
-
-      const sectionKey = `${courseCode}-${section}`;
-      if (!courses[sectionKey]) {
-        courses[sectionKey] = {
-          key: sectionKey,
-          code: courseCode,
-          name: courseName,
-          section,
-          department: departmentName,
-          teacher: cleanTeacher,
-          schedule: {}
-        };
-        WORK_DAYS.forEach((day) => {
-          courses[sectionKey].schedule[day] = [];
-        });
-      }
-
-      courses[sectionKey].schedule[dayName].push({
-        day: dayName,
-        startTime,
-        endTime,
-        room: cleanRoom,
-        teacher: cleanTeacher
-      });
-
-      const startHour = parseInt(startTime.split(':')[0], 10);
-      const endHour = parseInt(endTime.split(':')[0], 10);
-      const classDuration = Math.max(0, endHour - startHour);
-
-      for (let hour = startHour; hour < endHour; hour++) {
-        const hourKey = hour.toString().padStart(2, '0') + ':00';
-        if (teachers[cleanTeacher].schedule[dayName]) {
-          teachers[cleanTeacher].schedule[dayName][hourKey] = {
-            isBusy: true,
-            course: courseName,
-            room: cleanRoom,
-            classId: extractClassId(courseName),
-            section,
-            timeRange: `${startTime}-${endTime}`
+        if (!teachers[cleanTeacher]) {
+          teachers[cleanTeacher] = {
+            name: cleanTeacher,
+            department: departmentName,
+            schedule: {},
+            totalClasses: 0
           };
+          WORK_DAYS.forEach((day) => {
+            teachers[cleanTeacher].schedule[day] = {};
+          });
         }
-        if (classrooms[cleanRoom].schedule[dayName][hourKey]) {
-          classrooms[cleanRoom].schedule[dayName][hourKey] = {
-            isOccupied: true,
-            course: courseName,
-            teacher: cleanTeacher,
-            classId: extractClassId(courseName),
+
+        if (!classrooms[cleanRoom]) {
+          classrooms[cleanRoom] = {
+            name: cleanRoom,
+            schedule: {},
+            totalHours: 0,
+            totalClasses: 0,
+            departments: new Set<string>()
+          };
+          WORK_DAYS.forEach((day) => {
+            classrooms[cleanRoom].schedule[day] = {};
+            DISPLAY_HOURS.forEach((hourKey) => {
+              classrooms[cleanRoom].schedule[day][hourKey] = {
+                isOccupied: false,
+                course: null,
+                teacher: null
+              };
+            });
+          });
+        }
+
+        const sectionKey = `${courseCode}-${section}`;
+        if (!courses[sectionKey]) {
+          courses[sectionKey] = {
+            key: sectionKey,
+            code: courseCode,
+            name: courseName,
             section,
             department: departmentName,
-            timeRange: `${startTime}-${endTime}`
+            teacher: cleanTeacher,
+            schedule: {}
           };
+          WORK_DAYS.forEach((day) => {
+            courses[sectionKey].schedule[day] = [];
+          });
         }
-      }
 
-      teachers[cleanTeacher].totalClasses++;
-      classrooms[cleanRoom].totalHours += classDuration;
-      classrooms[cleanRoom].totalClasses++;
-      if (departmentName) {
-        classrooms[cleanRoom].departments.add(departmentName);
+        courses[sectionKey].schedule[dayName].push({
+          day: dayName,
+          startTime,
+          endTime,
+          room: cleanRoom,
+          teacher: cleanTeacher
+        });
+
+        const startHour = parseInt(startTime.split(':')[0], 10);
+        const endHour = parseInt(endTime.split(':')[0], 10);
+        const classDuration = Math.max(0, endHour - startHour);
+
+        for (let hour = startHour; hour < endHour; hour++) {
+          const hourKey = hour.toString().padStart(2, '0') + ':00';
+          if (teachers[cleanTeacher].schedule[dayName]) {
+            teachers[cleanTeacher].schedule[dayName][hourKey] = {
+              isBusy: true,
+              course: courseName,
+              room: cleanRoom,
+              classId: extractClassId(courseName),
+              section,
+              timeRange: `${startTime}-${endTime}`
+            };
+          }
+          if (classrooms[cleanRoom].schedule[dayName][hourKey]) {
+            classrooms[cleanRoom].schedule[dayName][hourKey] = {
+              isOccupied: true,
+              course: courseName,
+              teacher: cleanTeacher,
+              classId: extractClassId(courseName),
+              section,
+              department: departmentName,
+              timeRange: `${startTime}-${endTime}`
+            };
+          }
+        }
+
+        teachers[cleanTeacher].totalClasses++;
+        classrooms[cleanRoom].totalHours += classDuration;
+        classrooms[cleanRoom].totalClasses++;
+        if (departmentName) {
+          classrooms[cleanRoom].departments.add(departmentName);
+        }
+        totalClasses++;
       }
-      totalClasses++;
     }
   }
 

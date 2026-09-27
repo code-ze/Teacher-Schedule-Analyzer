@@ -98,8 +98,13 @@ export default function MeetingFinder({ teachers }: { teachers: Record<string, T
   const freeList = selectedArr.filter((n) => !busyNames.has(n));
 
   return (
-    <div className="meeting-finder-section">
-      <div className="mf-title">🗓️ Find a Meeting Time</div>
+    <section className="panel meeting-finder-section">
+      <div className="panel-header">
+        <div>
+          <h2>Meeting finder</h2>
+          <p className="panel-sub">Tick the instructors who need to meet; green slots are free for everyone. Click a slot for details.</p>
+        </div>
+      </div>
 
       <div className="mf-controls">
         <div className="mf-search-wrap">
@@ -324,6 +329,6 @@ export default function MeetingFinder({ teachers }: { teachers: Record<string, T
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

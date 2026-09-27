@@ -148,177 +148,152 @@ export default function TimeQuery({ teachers }: { teachers: Record<string, Teach
   const busyTotal = busyResults ? Object.values(busyResults).reduce((s, a) => s + a.length, 0) : 0;
   const freeTotal = freeResults ? Object.values(freeResults).reduce((s, a) => s + a.length, 0) : 0;
 
+  const daySelect = (value: string, onChange: (v: string) => void, id: string) => (
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="ALL">All days</option>
+      {WORK_DAYS.map((d) => (
+        <option key={d} value={d}>
+          {d}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
-    <div className="time-query-section">
-      <div>
-        <label htmlFor="timeQueryInput">Who has class at</label>
-        <input
-          id="timeQueryInput"
-          type="text"
-          placeholder="e.g. 11am or 13:00"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyUp={(e) => e.key === 'Enter' && runQuery()}
-        />
-        <select value={queryDay} onChange={(e) => setQueryDay(e.target.value)}>
-          <option value="ALL">All Days</option>
-          {WORK_DAYS.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-        <button className="btn" onClick={runQuery}>
-          Find
-        </button>
+    <section className="panel time-query-section">
+      <div className="panel-header">
+        <div>
+          <h2>Availability</h2>
+          <p className="panel-sub">Type a time like 11am, 1:30pm or 13:00.</p>
+        </div>
       </div>
 
-      <div style={{ marginTop: 15 }}>
-        {queryError && <div className="error">{queryError}</div>}
-        {busyResults && (
-          <>
-            <div className="common-free-title" style={{ margin: '8px 0' }}>
-              📅 Teachers with class at {busyHourKey} ({busyTotal} total)
-            </div>
-            {busyTotal === 0 ? (
-              <div className="no-common-time">No classes found at {busyHourKey}</div>
-            ) : (
-              WORK_DAYS.map((day) => {
-                const items = busyResults[day] || [];
-                return (
-                  <div
-                    key={day}
-                    style={{ background: '#f8f9fa', border: '1px solid #eee', borderRadius: 10, padding: 12, margin: '8px 0' }}
-                  >
-                    <div style={{ fontWeight: 600, color: '#2c3e50', marginBottom: 8 }}>
-                      {day} • {busyHourKey}
-                    </div>
-                    {items.length === 0 ? (
-                      <div className="no-slots-day">No classes</div>
-                    ) : (
-                      <ul
-                        style={{
-                          listStyle: 'none',
-                          padding: 0,
-                          margin: 0,
-                          display: 'grid',
-                          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                          gap: 8
-                        }}
-                      >
-                        {items.map((it, i) => (
-                          <li
-                            key={i}
-                            className="has-tooltip"
-                            data-tooltip={`${it.timeRange}\n${it.classId} • ${it.room}\n${it.course}`}
-                            style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: 8, padding: 10 }}
-                          >
-                            <div style={{ fontWeight: 600, color: '#34495e' }}>{it.name}</div>
-                            <div style={{ color: '#667eea', fontWeight: 600 }}>{it.classId}</div>
-                            <div style={{ color: '#666' }}>{it.room}</div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </>
-        )}
-      </div>
-
-      <div style={{ marginTop: 20, paddingTop: 20, borderTop: '1px solid #eee' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'center' }}>
-          <label htmlFor="timeRangeStart">Who is free from</label>
-          <input
-            id="timeRangeStart"
-            type="text"
-            placeholder="e.g. 10am or 10:00"
-            style={{ minWidth: 120 }}
-            value={rangeStart}
-            onChange={(e) => setRangeStart(e.target.value)}
-            onKeyUp={(e) => e.key === 'Enter' && runRangeQuery()}
-          />
-          <label htmlFor="timeRangeEnd">to</label>
-          <input
-            id="timeRangeEnd"
-            type="text"
-            placeholder="e.g. 12pm or 12:00"
-            style={{ minWidth: 120 }}
-            value={rangeEnd}
-            onChange={(e) => setRangeEnd(e.target.value)}
-            onKeyUp={(e) => e.key === 'Enter' && runRangeQuery()}
-          />
-          <select value={rangeDay} onChange={(e) => setRangeDay(e.target.value)}>
-            <option value="ALL">All Days</option>
-            {WORK_DAYS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-          <button className="btn" onClick={runRangeQuery}>
-            Find Free
-          </button>
+      <div className="query-grid">
+        <div className="query-card">
+          <h3>Who has class at…</h3>
+          <div className="form-row">
+            <input
+              id="timeQueryInput"
+              type="text"
+              aria-label="Time"
+              placeholder="e.g. 11am or 13:00"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyUp={(e) => e.key === 'Enter' && runQuery()}
+            />
+            {daySelect(queryDay, setQueryDay, 'timeQueryDay')}
+            <button className="btn" onClick={runQuery}>
+              Find
+            </button>
+          </div>
         </div>
 
-        <div style={{ marginTop: 15 }}>
-          {rangeError && <div className="error">{rangeError}</div>}
-          {freeResults && (
-            <>
-              <div className="common-free-title" style={{ margin: '8px 0', color: '#2e7d32' }}>
-                🆓 Teachers free from {freeRange[0]} to {freeRange[1]} ({freeTotal} total)
-              </div>
-              {freeTotal === 0 ? (
-                <div className="no-common-time">
-                  No teachers are free from {freeRange[0]} to {freeRange[1]}
-                </div>
-              ) : (
-                WORK_DAYS.map((day) => {
-                  const items = freeResults[day] || [];
-                  return (
-                    <div
-                      key={day}
-                      style={{ background: '#e8f5e8', border: '1px solid #c8e6c9', borderRadius: 10, padding: 12, margin: '8px 0' }}
-                    >
-                      <div style={{ fontWeight: 600, color: '#2e7d32', marginBottom: 8 }}>
-                        {day} • {freeRange[0]} - {freeRange[1]}
-                      </div>
-                      {items.length === 0 ? (
-                        <div className="no-slots-day">No free teachers</div>
-                      ) : (
-                        <ul
-                          style={{
-                            listStyle: 'none',
-                            padding: 0,
-                            margin: 0,
-                            display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                            gap: 8
-                          }}
+        <div className="query-card">
+          <h3>Who is free between…</h3>
+          <div className="form-row">
+            <input
+              id="timeRangeStart"
+              type="text"
+              aria-label="From"
+              placeholder="From: 10am"
+              value={rangeStart}
+              onChange={(e) => setRangeStart(e.target.value)}
+              onKeyUp={(e) => e.key === 'Enter' && runRangeQuery()}
+            />
+            <input
+              id="timeRangeEnd"
+              type="text"
+              aria-label="To"
+              placeholder="To: 12pm"
+              value={rangeEnd}
+              onChange={(e) => setRangeEnd(e.target.value)}
+              onKeyUp={(e) => e.key === 'Enter' && runRangeQuery()}
+            />
+            {daySelect(rangeDay, setRangeDay, 'timeRangeDay')}
+            <button className="btn" onClick={runRangeQuery}>
+              Find free
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {queryError && <div className="error">{queryError}</div>}
+      {busyResults && (
+        <div className="results">
+          <div className="results-title">
+            📅 In class at {busyHourKey} <span className="count-pill">{busyTotal}</span>
+          </div>
+          {busyTotal === 0 ? (
+            <div className="empty-state">No classes found at {busyHourKey}.</div>
+          ) : (
+            WORK_DAYS.filter((day) => busyResults[day]).map((day) => {
+              const items = busyResults[day] || [];
+              return (
+                <div className="day-group" key={day}>
+                  <div className="day-group-title">
+                    {day} <span className="muted">· {items.length}</span>
+                  </div>
+                  {items.length === 0 ? (
+                    <div className="no-slots-day">No classes</div>
+                  ) : (
+                    <ul className="result-grid">
+                      {items.map((it, i) => (
+                        <li
+                          key={i}
+                          className="result-item has-tooltip"
+                          data-tooltip={`${it.timeRange}\n${it.classId} • ${it.room}\n${it.course}`}
                         >
-                          {items.map((it) => (
-                            <li
-                              key={it.name}
-                              style={{ background: '#fff', border: '1px solid #4CAF50', borderRadius: 8, padding: 12, textAlign: 'center' }}
-                            >
-                              <div style={{ fontWeight: 600, color: '#2e7d32', fontSize: '1.1em' }}>{it.name}</div>
-                              <div style={{ color: '#4CAF50', fontSize: '0.9em', marginTop: 4 }}>
-                                ✅ Free for {it.freeHours} hours
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </>
+                          <div className="result-name">{it.name}</div>
+                          <div className="result-meta">
+                            <span className="tag">{it.classId}</span> {it.room} · {it.timeRange}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {rangeError && <div className="error">{rangeError}</div>}
+      {freeResults && (
+        <div className="results">
+          <div className="results-title">
+            🆓 Free from {freeRange[0]} to {freeRange[1]} <span className="count-pill">{freeTotal}</span>
+          </div>
+          {freeTotal === 0 ? (
+            <div className="empty-state">
+              No instructors are free from {freeRange[0]} to {freeRange[1]}.
+            </div>
+          ) : (
+            WORK_DAYS.filter((day) => freeResults[day]).map((day) => {
+              const items = freeResults[day] || [];
+              return (
+                <div className="day-group" key={day}>
+                  <div className="day-group-title">
+                    {day} <span className="muted">· {items.length}</span>
+                  </div>
+                  {items.length === 0 ? (
+                    <div className="no-slots-day">No free instructors</div>
+                  ) : (
+                    <ul className="result-grid">
+                      {items.map((it) => (
+                        <li key={it.name} className="result-item result-free">
+                          <div className="result-name">{it.name}</div>
+                          <div className="result-meta">✅ Free for {it.freeHours} hours</div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </section>
   );
 }

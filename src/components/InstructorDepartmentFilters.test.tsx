@@ -54,15 +54,19 @@ describe('TeacherSchedules department filter', () => {
 
     render(<TeacherSchedules teachers={teachers} />);
 
+    // The list is paged: the first page is shown and the total is reported.
     const initialCards = document.querySelectorAll('.teacher-card');
-    expect(initialCards.length).toBe(totalTeachers);
+    expect(initialCards.length).toBe(Math.min(totalTeachers, 40));
+    expect(screen.getByText(`${totalTeachers} instructors`)).toBeTruthy();
 
-    const select = screen.getByDisplayValue('All Departments') as HTMLSelectElement;
+    const select = screen.getByDisplayValue('All departments') as HTMLSelectElement;
     fireEvent.change(select, { target: { value: 'Engineering' } });
 
+    const engineeringCount = Object.values(teachers).filter((t) => t.department === 'Engineering').length;
+    expect(engineeringCount).toBeLessThan(totalTeachers);
+    expect(screen.getByText(`${engineeringCount} instructors`)).toBeTruthy();
     const filteredCards = document.querySelectorAll('.teacher-card');
-    expect(filteredCards.length).toBeGreaterThan(0);
-    expect(filteredCards.length).toBeLessThan(totalTeachers);
+    expect(filteredCards.length).toBe(Math.min(engineeringCount, 40));
 
     Array.from(filteredCards).forEach((card) => {
       const name = card.querySelector('.teacher-name')?.textContent;
@@ -78,10 +82,10 @@ describe('TeacherSchedules department filter', () => {
     const { teachers } = loadRealData();
     render(<TeacherSchedules teachers={teachers} />);
 
-    const select = screen.getByDisplayValue('All Departments') as HTMLSelectElement;
+    const select = screen.getByDisplayValue('All departments') as HTMLSelectElement;
     fireEvent.change(select, { target: { value: 'Engineering' } });
 
-    const search = screen.getByPlaceholderText('Enter instructor name to filter...');
+    const search = screen.getByLabelText('Search instructors');
     fireEvent.change(search, { target: { value: 'zzzznomatch' } });
 
     expect(document.querySelectorAll('.teacher-card').length).toBe(0);

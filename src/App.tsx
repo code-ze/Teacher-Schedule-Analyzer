@@ -7,51 +7,103 @@ import ClassroomsSection from './components/ClassroomsSection';
 import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
 import { useScheduleData } from './hooks/useScheduleData';
+import { TABS, type TabId } from './tabs';
+
 
 export default function App() {
-  const { data, loading, error, loadFiles } = useScheduleData();
+  const { data, loading, error, fileNames, loadFiles } = useScheduleData();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
+  const [tab, setTab] = useState<TabId>('overview');
+  const hasData = !loading && !!data && data.totalClasses > 0;
+
+  const openTab = (id: TabId) => {
+    setTab(id);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // On narrow screens the tab bar scrolls sideways; keep the chosen tab visible.
+    document.getElementById(`tab-${id}`)?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+  };
 
   return (
-    <div className="container">
-      <div className="header">
-        <h1>📚 Teacher Schedule Analyzer</h1>
-        <p>Upload your course schedule (CSV, Excel, or Oracle timetable export) to find when teachers are available and analyze classroom occupancy</p>
-      </div>
-
-      <FileUpload onFiles={(files) => loadFiles(files)} />
-
-      {error && error !== dismissedError && (
-        <div className="error" style={{ margin: '0 40px' }}>
-          <strong>Error:</strong> {error}
-          <button
-            onClick={() => setDismissedError(error)}
-            style={{ float: 'right', border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: 700 }}
-          >
-            ✕
-          </button>
+    <>
+      <header className="app-header">
+        <div className="app-header-inner">
+          <div className="brand">
+            <span className="brand-mark" aria-hidden>
+              📚
+            </span>
+            <div>
+              <h1>Teacher Schedule Analyzer</h1>
+              <p>Instructor availability, meeting times and room utilization from your timetable</p>
+            </div>
+          </div>
+          {hasData && <FileUpload compact fileNames={fileNames} onFiles={(files) => loadFiles(files)} />}
         </div>
+      </header>
+
+      {hasData && (
+        <nav className="tabs" aria-label="Sections">
+          <div className="tabs-inner">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                id={`tab-${t.id}`}
+                className={`tab${tab === t.id ? ' active' : ''}`}
+                aria-current={tab === t.id ? 'page' : undefined}
+                onClick={() => openTab(t.id)}
+              >
+                <span aria-hidden>{t.icon}</span> {t.label}
+              </button>
+            ))}
+          </div>
+        </nav>
       )}
 
-      {loading && (
-        <div className="loading">
-          <div className="spinner" />
-          <p>Analyzing your schedule data...</p>
-        </div>
-      )}
+      <main className="container">
+        {error && error !== dismissedError && (
+          <div className="error" role="alert">
+            <span>
+              <strong>Error:</strong> {error}
+            </span>
+            <button className="error-close" aria-label="Dismiss" onClick={() => setDismissedError(error)}>
+              ✕
+            </button>
+          </div>
+        )}
 
-      {!loading && data && data.totalClasses > 0 && (
-        <div className="results-section">
-          <StatsPanel data={data} />
-          <TimeQuery teachers={data.teachers} />
-          <MeetingFinder teachers={data.teachers} />
-          <DepartmentReportSection courses={data.courses} departments={data.departments} />
-          <ClassroomsSection classrooms={data.classrooms} />
-          <TeacherSchedules teachers={data.teachers} />
-        </div>
-      )}
+        {loading && (
+          <div className="loading">
+            <div className="spinner" />
+            <p>Analyzing your schedule data…</p>
+          </div>
+        )}
+
+        {!loading && !hasData && <FileUpload onFiles={(files) => loadFiles(files)} />}
+
+        {hasData && data && (
+          <>
+            <div hidden={tab !== 'overview'}>
+              <StatsPanel data={data} onOpenTab={openTab} />
+            </div>
+            <div hidden={tab !== 'availability'}>
+              <TimeQuery teachers={data.teachers} />
+            </div>
+            <div hidden={tab !== 'meeting'}>
+              <MeetingFinder teachers={data.teachers} />
+            </div>
+            <div hidden={tab !== 'rooms'}>
+              <ClassroomsSection classrooms={data.classrooms} />
+            </div>
+            <div hidden={tab !== 'report'}>
+              <DepartmentReportSection courses={data.courses} departments={data.departments} />
+            </div>
+            <div hidden={tab !== 'instructors'}>
+              <TeacherSchedules teachers={data.teachers} />
+            </div>
+          </>
+        )}
+      </main>
 
       <footer className="app-footer">© Amjad Al Kharusi</footer>
-    </div>
+    </>
   );
 }
