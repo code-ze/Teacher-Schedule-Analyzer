@@ -37,10 +37,9 @@ describe('ClassroomsSection with the real CollegeTimeTable data', () => {
     const initialCards = document.querySelectorAll('.classroom-card');
     expect(initialCards.length).toBe(totalRoomCount);
 
-    // Selecting a department in the filter dropdown narrows the room grid down to
+    // Ticking a department in the filter narrows the room grid down to
     // only the rooms that department actually uses.
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    fireEvent.change(select, { target: { value: 'Business Studies' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Business Studies' }));
 
     const filteredCards = document.querySelectorAll('.classroom-card');
     expect(filteredCards.length).toBeGreaterThan(0);

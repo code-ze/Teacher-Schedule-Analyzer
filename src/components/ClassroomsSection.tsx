@@ -136,14 +136,19 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
   const allClassrooms = useMemo(() => withOccupancy(classrooms), [classrooms]);
   const departmentStats = useMemo(() => computeDepartmentUtilization(classrooms), [classrooms]);
 
-  const [selectedDept, setSelectedDept] = useState<string>('ALL');
+  const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
+  const toggleDept = (dept: string) =>
+    setSelectedDepts((prev) => (prev.includes(dept) ? prev.filter((d) => d !== dept) : [...prev, dept]));
+  const exportedStats = selectedDepts.length
+    ? departmentStats.filter((d) => selectedDepts.includes(d.name))
+    : departmentStats;
   const [roomSearch, setRoomSearch] = useState('');
   const [buildingSearch, setBuildingSearch] = useState('');
 
   const filteredClassrooms = useMemo(() => {
     let list = allClassrooms;
-    if (selectedDept !== 'ALL') {
-      list = list.filter((c) => c.departments.has(selectedDept));
+    if (selectedDepts.length > 0) {
+      list = list.filter((c) => selectedDepts.some((d) => c.departments.has(d)));
     }
     const terms = roomSearch
       .toLowerCase()
@@ -154,7 +159,7 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
       list = list.filter((c) => terms.some((t) => c.name.toLowerCase().includes(t)));
     }
     return [...list].sort((a, b) => (b.occupancyPercentage ?? 0) - (a.occupancyPercentage ?? 0));
-  }, [allClassrooms, selectedDept, roomSearch]);
+  }, [allClassrooms, selectedDepts, roomSearch]);
 
   const buildingResults: BuildingCourseRow[] = useMemo(() => {
     const prefix = buildingSearch.trim().toLowerCase();
@@ -196,10 +201,10 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
           🏛️ Department Room Utilization
           {departmentStats.length > 0 && (
             <>
-              <button className="export-pdf-btn" onClick={() => exportDepartmentUtilizationPDF(departmentStats)}>
+              <button className="export-pdf-btn" onClick={() => exportDepartmentUtilizationPDF(exportedStats)}>
                 📄 Export PDF
               </button>
-              <button className="export-excel-btn" onClick={() => exportDepartmentUtilizationExcel(departmentStats)}>
+              <button className="export-excel-btn" onClick={() => exportDepartmentUtilizationExcel(exportedStats)}>
                 📊 Export Excel
               </button>
             </>
@@ -212,9 +217,9 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
             {departmentStats.map((dept) => (
               <div
                 key={dept.name}
-                className={`department-card${selectedDept === dept.name ? ' active' : ''}`}
-                onClick={() => setSelectedDept((prev) => (prev === dept.name ? 'ALL' : dept.name))}
-                title="Click to filter classrooms below by this department"
+                className={`department-card${selectedDepts.includes(dept.name) ? ' active' : ''}`}
+                onClick={() => toggleDept(dept.name)}
+                title="Click to select or unselect this department (you can pick several)"
               >
                 <div className="department-card-name">{dept.name}</div>
                 <div className="occupancy-bar">
@@ -252,22 +257,23 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
 
         <div className="search-filter-container" style={{ border: '1px solid #7e57c2' }}>
           <label style={{ display: 'block', fontWeight: 600, color: '#4527a0', marginBottom: 8 }}>
-            🏛️ Filter by Department
+            🏛️ Filter by Department (pick one or more)
           </label>
-          <div className="department-filter-bar">
-            <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)}>
-              <option value="ALL">All Departments</option>
-              {departmentStats.map((d) => (
-                <option key={d.name} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-            {selectedDept !== 'ALL' && (
-              <button className="btn" onClick={() => setSelectedDept('ALL')} style={{ padding: '8px 18px' }}>
+          <div className="department-report-picker">
+            {departmentStats.map((d) => (
+              <label key={d.name} className={`department-report-chip${selectedDepts.includes(d.name) ? ' selected' : ''}`}>
+                <input type="checkbox" checked={selectedDepts.includes(d.name)} onChange={() => toggleDept(d.name)} />
+                {d.name}
+              </label>
+            ))}
+            {selectedDepts.length > 0 && (
+              <button className="btn" onClick={() => setSelectedDepts([])} style={{ padding: '8px 18px' }}>
                 Clear filter
               </button>
             )}
+          </div>
+          <div style={{ marginTop: 6, fontSize: '0.85em', color: '#666' }}>
+            💡 Tick one or more departments (or click the cards above) to show only the rooms they use
           </div>
         </div>
 

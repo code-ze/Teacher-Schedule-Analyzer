@@ -4,6 +4,7 @@ import StatsPanel from './components/StatsPanel';
 import TimeQuery from './components/TimeQuery';
 import MeetingFinder from './components/MeetingFinder';
 import ClassroomsSection from './components/ClassroomsSection';
+import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
 import { useScheduleData } from './hooks/useScheduleData';
 
@@ -44,6 +45,7 @@ export default function App() {
           <StatsPanel data={data} />
           <TimeQuery teachers={data.teachers} />
           <MeetingFinder teachers={data.teachers} />
+          <DepartmentReportSection courses={data.courses} departments={data.departments} />
           <ClassroomsSection classrooms={data.classrooms} />
           <TeacherSchedules teachers={data.teachers} />
         </div>
