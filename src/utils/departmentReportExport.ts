@@ -54,10 +54,15 @@ function summaryRows(report: DepartmentReport): [string, string | number][] {
   ];
 }
 
+export function hourShareOfWeek(report: DepartmentReport): number {
+  return report.capacityPerRoom > 0 ? Math.round((1000 / report.capacityPerRoom)) / 10 : 0;
+}
+
 function methodNote(report: DepartmentReport): string {
   return (
     `Available time = ${report.days.length} teaching days (${report.days.join(', ')}) x 8 hours (08:00-16:00) = ` +
-    `${report.capacityPerRoom} hours per room per week. Utilization = booked hours / available hours.`
+    `${report.capacityPerRoom} hours per room per week. Utilization = booked hours / available hours. ` +
+    `1 hour = 12.5% of a room's day (${hourShareOfWeek(report)}% of its week); exact class times matter less than total hours.`
   );
 }
 

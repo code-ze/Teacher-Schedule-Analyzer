@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
 import { processScheduleData } from '../parsers/scheduleProcessor';
 import { buildDepartmentReport } from './departmentReport';
-import { buildDepartmentReportPDF, buildDepartmentReportWorkbook } from './departmentReportExport';
+import { buildDepartmentReportPDF, buildDepartmentReportWorkbook, hourShareOfWeek } from './departmentReportExport';
 import type { RawRow } from '../types';
 
 // Small synthetic timetable: Design owns R1, shares R2 with Mass Communication.
@@ -21,6 +21,7 @@ describe('buildDepartmentReport', () => {
   it('counts capacity over the days the timetable uses', () => {
     expect(report.days).toEqual(['Sunday', 'Monday', 'Tuesday', 'Thursday']);
     expect(report.capacityPerRoom).toBe(32);
+    expect(hourShareOfWeek(report)).toBe(3.1);
   });
 
   it('lists every class of the department and only the rooms it uses', () => {

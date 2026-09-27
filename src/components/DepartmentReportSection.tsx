@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CourseSection } from '../types';
 import { buildDepartmentReport } from '../utils/departmentReport';
-import { exportDepartmentReportExcel, exportDepartmentReportPDF } from '../utils/departmentReportExport';
+import { exportDepartmentReportExcel, exportDepartmentReportPDF, hourShareOfWeek } from '../utils/departmentReportExport';
 
 function utilColor(pct: number): string {
   if (pct >= 75) return '#d32f2f';
@@ -66,7 +66,8 @@ export default function DepartmentReportSection({ courses, departments }: Props)
           </p>
           <p className="department-report-note">
             Available time = {report.days.length} days × 8 hours (08:00–16:00) = {report.capacityPerRoom} hours per
-            room per week. The downloads also list every class, the other departments' classes in these rooms, a
+            room per week. <strong>1 hour = 12.5% of a room's day</strong> ({hourShareOfWeek(report)}% of its week), so
+            the total hours matter more than the exact class times. The downloads also list every class, the other departments' classes in these rooms, a
             weekly timetable per room and instructor loads.
           </p>
 
