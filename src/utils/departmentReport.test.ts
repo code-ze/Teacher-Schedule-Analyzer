@@ -24,21 +24,30 @@ describe('buildDepartmentReport', () => {
     expect(hourShareOfWeek(report)).toBe(3.1);
   });
 
-  it('lists every class of the department and only the rooms it uses', () => {
+  it('lists every class of the department and only the rooms it uses, busiest first', () => {
     expect(report.meetings).toHaveLength(4);
-    expect(report.rooms.map((r) => r.room)).toEqual(['R1', 'R2']);
-    expect(report.summary).toMatchObject({ courses: 2, sections: 3, weeklyClasses: 4, weeklyHours: 8, instructors: 2, sharedRooms: 1, exclusiveRooms: 1 });
+    expect(report.rooms.map((r) => r.room)).toEqual(['R2', 'R1']);
+    expect(report.summary).toMatchObject({ courses: 2, sections: 3, weeklyClasses: 4, weeklyHours: 8, instructors: 2, rooms: 2 });
   });
 
   it('splits each room between the department and the others sharing it', () => {
     const r2 = report.rooms.find((r) => r.room === 'R2')!;
-    expect(r2.departmentHours).toBe(4);
+    expect(r2.selectedHours).toBe(4);
     expect(r2.otherHours).toEqual({ 'Mass Communication': 7 });
     expect(r2.freeHours).toBe(21);
     expect(r2.totalUtilization).toBe(34.4);
-    expect(r2.departmentShare).toBe(36.4);
+    expect(r2.selectedShare).toBe(36.4);
     expect(report.otherMeetings.every((m) => m.room === 'R2')).toBe(true);
     expect(report.rooms.find((r) => r.room === 'R1')!.sharedWith).toEqual([]);
+  });
+
+  it('totals own rooms vs shared rooms', () => {
+    expect(report.selectedOnlyRooms).toMatchObject({ rooms: ['R1'], selectedHours: 4, freeHours: 28, totalUtilization: 12.5 });
+    expect(report.sharedRooms).toMatchObject({ rooms: ['R2'], selectedHours: 4, otherHours: 7, totalUtilization: 34.4 });
+    const [design] = report.byDepartment;
+    expect(design.ownRooms.rooms).toEqual(['R1']);
+    expect(design.sharedRooms.departmentShare).toBe(36.4);
+    expect(report.findings.some((f) => f.text.startsWith('Design has 1 room(s) of its own, used 12.5%'))).toBe(true);
   });
 
   it('flags overlapping classes in the same room', () => {
@@ -48,9 +57,33 @@ describe('buildDepartmentReport', () => {
 
   it('builds the Excel workbook and PDF', () => {
     const wb = buildDepartmentReportWorkbook(report);
-    expect(wb.SheetNames).toEqual(['Summary', 'Rooms', 'Design Classes', 'Other Depts in These Rooms', 'Room Timetables', 'Instructors', 'Clashes']);
+    expect(wb.SheetNames).toEqual(['Summary', 'Rooms', 'Classes', 'Other Depts in These Rooms', 'Room Timetables', 'Instructors', 'Clashes']);
     const timetable = XLSX.utils.sheet_to_json<string[]>(wb.Sheets['Room Timetables'], { header: 1 });
     expect(timetable.some((row) => row.includes('CIDN1102-2 (Design) + CIJR2101-1 (Mass Communication)'))).toBe(true);
-    expect(buildDepartmentReportPDF(report).getNumberOfPages()).toBeGreaterThan(0);
+    expect(buildDepartmentReportPDF(report).getNumberOfPages()).toBeGreaterThan(1);
+  });
+});
+
+describe('buildDepartmentReport with several departments', () => {
+  const data = processScheduleData(rows);
+  const report = buildDepartmentReport(data.courses, ['Mass Communication', 'Design']);
+
+  it('covers every room any selected department uses', () => {
+    expect(report.departments).toEqual(['Design', 'Mass Communication']);
+    expect(report.rooms.map((r) => r.room).sort()).toEqual(['R1', 'R2', 'R9']);
+    expect(report.otherMeetings).toEqual([]);
+    expect(report.summary).toMatchObject({ weeklyClasses: 7, weeklyHours: 17, selectedShare: 100 });
+  });
+
+  it('keeps own rooms per department even when the rooms are shared inside the selection', () => {
+    const [design, masscomm] = report.byDepartment;
+    expect(design.ownRooms.rooms).toEqual(['R1']);
+    expect(design.sharedRooms.departmentShare).toBe(36.4);
+    expect(masscomm.ownRooms.rooms).toEqual(['R9']);
+    expect(masscomm.sharedRooms.departmentShare).toBe(63.6);
+    expect(report.selectedOnlyRooms.rooms).toHaveLength(3);
+    expect(report.sharedRooms.rooms).toHaveLength(0);
+    const r2 = report.rooms.find((r) => r.room === 'R2')!;
+    expect(r2.hoursByDepartment).toEqual({ Design: 4, 'Mass Communication': 7 });
   });
 });

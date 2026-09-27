@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { WORK_DAYS } from '../config';
-import type { DepartmentReport, ReportMeeting, RoomUsage } from './departmentReport';
+import { toMinutes, type DepartmentReport, type ReportMeeting, type RoomUsage } from './departmentReport';
 
 function today(): string {
   return new Date().toISOString().split('T')[0];
@@ -13,7 +13,29 @@ function slug(s: string): string {
 }
 
 export function departmentReportFileName(report: DepartmentReport, ext: 'pdf' | 'xlsx'): string {
-  return `${slug(report.department)}-room-utilization-${today()}.${ext}`;
+  const who = report.departments.length <= 3 ? report.departments.map(slug).join('_') : `${report.departments.length}-departments`;
+  return `${who}-room-utilization-${today()}.${ext}`;
+}
+
+export function hourShareOfWeek(report: DepartmentReport): number {
+  return report.capacityPerRoom > 0 ? Math.round(1000 / report.capacityPerRoom) / 10 : 0;
+}
+
+/** "Only Design" / "Only selected departments" */
+export function onlyLabel(report: DepartmentReport): string {
+  return report.departments.length === 1 ? `Only ${report.label}` : 'Only selected departments';
+}
+
+function titleDepartments(report: DepartmentReport): string {
+  return report.departments.join(' + ');
+}
+
+function methodNote(report: DepartmentReport): string {
+  return (
+    `Available time = ${report.days.length} teaching days (${report.days.join(', ')}) x 8 hours (08:00-16:00) = ` +
+    `${report.capacityPerRoom} hours per room per week. Utilization = booked hours / available hours. ` +
+    `1 hour = 12.5% of a room's day (${hourShareOfWeek(report)}% of its week).`
+  );
 }
 
 const dayOrder = (day: string) => WORK_DAYS.indexOf(day as (typeof WORK_DAYS)[number]);
@@ -27,51 +49,65 @@ function byCourse(a: ReportMeeting, b: ReportMeeting): number {
   );
 }
 
-function sharedWithText(room: RoomUsage): string {
-  return room.sharedWith.map((d) => `${d} (${room.otherHours[d]}h)`).join(', ');
+function hoursText(hours: Record<string, number>): string {
+  return Object.keys(hours)
+    .sort((a, b) => a.localeCompare(b))
+    .map((d) => `${d} ${hours[d]}h`)
+    .join(', ');
 }
 
-function summaryRows(report: DepartmentReport): [string, string | number][] {
+function roomStatus(report: DepartmentReport, r: RoomUsage): string {
+  if (r.sharedWith.length > 0) return 'Shared';
+  return report.departments.length > 1 && r.usedBy.length > 1 ? 'Selected depts only' : `Only ${r.usedBy[0]}`;
+}
+
+function keyFigures(report: DepartmentReport): [string, string][] {
   const s = report.summary;
-  const dept = report.department;
   return [
-    ['Courses', s.courses],
-    ['Sections', s.sections],
-    ['Classes per week', s.weeklyClasses],
-    ['Teaching hours per week', s.weeklyHours],
-    ['Instructors', s.instructors],
-    ['Rooms used', s.rooms],
-    [`Rooms used only by ${dept}`, s.exclusiveRooms],
-    ['Rooms shared with other departments', s.sharedRooms],
-    ['Available hours in these rooms (per week)', s.capacityHours],
-    [`Hours used by ${dept}`, s.weeklyHours],
-    ['Hours used by other departments', s.otherDepartmentHours],
-    ['Free hours', s.freeHours],
-    [`${dept} utilization of its rooms`, `${s.departmentUtilization}%`],
-    ['Total utilization of these rooms (all departments)', `${s.totalUtilization}%`],
-    [`${dept} share of the booked time`, `${s.departmentShare}%`],
-    ['Room clashes / combined classes', report.clashes.length]
+    [String(s.weeklyClasses), 'Classes / week'],
+    [String(s.weeklyHours), 'Teaching hours / week'],
+    [String(s.rooms), 'Rooms used'],
+    [`${s.totalUtilization}%`, 'Room use (all depts)'],
+    [`${s.selectedShare}%`, `${report.departments.length === 1 ? report.label : 'Selected'} share of booked time`],
+    [String(s.freeHours), 'Free room-hours / week']
   ];
 }
 
-export function hourShareOfWeek(report: DepartmentReport): number {
-  return report.capacityPerRoom > 0 ? Math.round((1000 / report.capacityPerRoom)) / 10 : 0;
+function roomGroupRows(report: DepartmentReport): (string | number)[][] {
+  const g = [
+    [onlyLabel(report), report.selectedOnlyRooms],
+    ['Shared with other departments', report.sharedRooms]
+  ] as const;
+  const s = report.summary;
+  return [
+    ...g.map(([name, t]) => [
+      name, t.rooms.length, t.selectedHours, t.otherHours, t.freeHours, `${t.totalUtilization}%`, t.rooms.join(', ')
+    ]),
+    ['All rooms', s.rooms, s.weeklyHours, s.otherDepartmentHours, s.freeHours, `${s.totalUtilization}%`, '']
+  ];
 }
 
-function methodNote(report: DepartmentReport): string {
-  return (
-    `Available time = ${report.days.length} teaching days (${report.days.join(', ')}) x 8 hours (08:00-16:00) = ` +
-    `${report.capacityPerRoom} hours per room per week. Utilization = booked hours / available hours. ` +
-    `1 hour = 12.5% of a room's day (${hourShareOfWeek(report)}% of its week); exact class times matter less than total hours.`
-  );
+function departmentRows(report: DepartmentReport): (string | number)[][] {
+  return report.byDepartment.map((d) => [
+    d.department,
+    d.weeklyClasses,
+    d.weeklyHours,
+    d.instructors,
+    d.rooms,
+    d.ownRooms.rooms.length,
+    d.ownRooms.rooms.length ? `${d.ownRooms.totalUtilization}%` : '-',
+    d.sharedRooms.rooms.length,
+    d.sharedRooms.rooms.length ? `${d.sharedRooms.departmentShare}%` : '-'
+  ]);
+}
+
+const DEPARTMENT_HEADER = ['Department', 'Classes / wk', 'Hours / wk', 'Instructors', 'Rooms', 'Own rooms', 'Own rooms used', 'Shared rooms', 'Its share of shared rooms'];
+function groupHeader(report: DepartmentReport): string[] {
+  const who = report.departments.length === 1 ? report.label : 'Selected depts';
+  return ['Rooms', 'Count', `${who} hrs`, 'Other depts hrs', 'Free hrs', 'Use', 'Room list'];
 }
 
 // ---------- Excel ----------
-
-function toMinutes(time: string): number {
-  const [h, m] = time.split(':').map((v) => parseInt(v, 10));
-  return h * 60 + (m || 0);
-}
 
 function roomTimetableRows(report: DepartmentReport): (string | number)[][] {
   const all = [...report.meetings, ...report.otherMeetings];
@@ -80,22 +116,13 @@ function roomTimetableRows(report: DepartmentReport): (string | number)[][] {
   const maxHour = Math.max(16, ...all.map((m) => Math.ceil(toMinutes(m.endTime) / 60)));
   const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
 
-  report.rooms.forEach((room) => {
-    rows.push([
-      `${room.room} - ${room.totalUtilization}% used (${report.department}: ${room.departmentHours}h, ` +
-        `others: ${room.otherHoursTotal}h, free: ${room.freeHours}h)`
-    ]);
+  [...report.rooms].sort((a, b) => a.room.localeCompare(b.room)).forEach((room) => {
+    rows.push([`${room.room} - ${room.totalUtilization}% used (${hoursText({ ...room.hoursByDepartment, ...room.otherHours })}; free ${room.freeHours}h)`]);
     rows.push(['Time', ...report.days]);
     for (let h = minHour; h < maxHour; h++) {
       const cells = report.days.map((day) =>
         all
-          .filter(
-            (m) =>
-              m.room === room.room &&
-              m.day === day &&
-              toMinutes(m.startTime) < (h + 1) * 60 &&
-              toMinutes(m.endTime) > h * 60
-          )
+          .filter((m) => m.room === room.room && m.day === day && toMinutes(m.startTime) < (h + 1) * 60 && toMinutes(m.endTime) > h * 60)
           .map((m) => `${m.code}-${m.section} (${m.department})`)
           .join(' + ')
       );
@@ -108,40 +135,50 @@ function roomTimetableRows(report: DepartmentReport): (string | number)[][] {
 
 export function buildDepartmentReportWorkbook(report: DepartmentReport): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
-  const dept = report.department;
 
   const summary = XLSX.utils.aoa_to_sheet([
-    [`${dept} - Room Utilization Report`],
+    [`Room Utilization Report - ${titleDepartments(report)}`],
     [`Generated ${today()}`],
+    [methodNote(report)],
     [],
-    ['Measure', 'Value'],
-    ...summaryRows(report),
+    ['KEY FIGURES'],
+    ...keyFigures(report).map(([v, l]) => [l, v]),
     [],
-    [methodNote(report)]
+    ['KEY FINDINGS'],
+    ...report.findings.map((f) => [f.text]),
+    [],
+    ['BY DEPARTMENT'],
+    DEPARTMENT_HEADER,
+    ...departmentRows(report),
+    [],
+    ['OWN ROOMS VS SHARED ROOMS'],
+    groupHeader(report),
+    ...roomGroupRows(report)
   ]);
-  summary['!cols'] = [{ wch: 48 }, { wch: 14 }];
+  summary['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 13 }, { wch: 15 }, { wch: 12 }, { wch: 11 }, { wch: 15 }, { wch: 13 }, { wch: 24 }];
   XLSX.utils.book_append_sheet(wb, summary, 'Summary');
 
   const rooms = XLSX.utils.aoa_to_sheet([
-    ['Room', `${dept} hours`, 'Other dept hours', 'Free hours', 'Available hours', `${dept} use %`, 'Total use %', `${dept} share of booked time %`, `${dept} classes`, 'Other classes', 'Shared with'],
+    ['Room', 'Status', ...report.departments.map((d) => `${d} hrs`), 'Other depts hrs', 'Other depts', 'Free hrs', 'Total use %', 'Selected share %'],
     ...report.rooms.map((r) => [
-      r.room, r.departmentHours, r.otherHoursTotal, r.freeHours, r.capacityHours,
-      r.departmentUtilization, r.totalUtilization, r.departmentShare, r.departmentClasses, r.otherClasses,
-      sharedWithText(r) || `Only ${dept}`
+      r.room, roomStatus(report, r), ...report.departments.map((d) => r.hoursByDepartment[d] || 0),
+      r.otherHoursTotal, hoursText(r.otherHours), r.freeHours, r.totalUtilization, r.selectedShare
     ])
   ]);
-  rooms['!cols'] = [{ wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 11 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 13 }, { wch: 60 }];
+  rooms['!cols'] = [{ wch: 10 }, { wch: 22 }, ...report.departments.map(() => ({ wch: 16 })), { wch: 15 }, { wch: 55 }, { wch: 9 }, { wch: 12 }, { wch: 16 }];
   XLSX.utils.book_append_sheet(wb, rooms, 'Rooms');
 
-  const meetingHeader = ['Course', 'Course Name', 'Section', 'Day', 'Time', 'Hours', 'Room', 'Instructor'];
-  const meetingRow = (m: ReportMeeting) => [m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.hours, m.room, m.teacher];
-
-  const classes = XLSX.utils.aoa_to_sheet([meetingHeader, ...[...report.meetings].sort(byCourse).map(meetingRow)]);
-  classes['!cols'] = [{ wch: 11 }, { wch: 44 }, { wch: 8 }, { wch: 11 }, { wch: 12 }, { wch: 7 }, { wch: 9 }, { wch: 30 }];
-  XLSX.utils.book_append_sheet(wb, classes, `${dept} Classes`.slice(0, 31));
+  const classes = XLSX.utils.aoa_to_sheet([
+    ['Department', 'Course', 'Course Name', 'Section', 'Day', 'Time', 'Hours', 'Room', 'Instructor'],
+    ...[...report.meetings]
+      .sort((a, b) => a.department.localeCompare(b.department) || byCourse(a, b))
+      .map((m) => [m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.hours, m.room, m.teacher])
+  ]);
+  classes['!cols'] = [{ wch: 26 }, { wch: 11 }, { wch: 44 }, { wch: 8 }, { wch: 11 }, { wch: 12 }, { wch: 7 }, { wch: 9 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, classes, 'Classes');
 
   const others = XLSX.utils.aoa_to_sheet([
-    ['Room', 'Department', ...meetingHeader.filter((h) => h !== 'Room')],
+    ['Room', 'Department', 'Course', 'Course Name', 'Section', 'Day', 'Time', 'Hours', 'Instructor'],
     ...report.otherMeetings.map((m) => [m.room, m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.hours, m.teacher])
   ]);
   others['!cols'] = [{ wch: 9 }, { wch: 30 }, { wch: 11 }, { wch: 44 }, { wch: 8 }, { wch: 11 }, { wch: 12 }, { wch: 7 }, { wch: 30 }];
@@ -152,10 +189,10 @@ export function buildDepartmentReportWorkbook(report: DepartmentReport): XLSX.Wo
   XLSX.utils.book_append_sheet(wb, timetable, 'Room Timetables');
 
   const instructors = XLSX.utils.aoa_to_sheet([
-    ['Instructor', 'Sections', 'Classes per week', 'Hours per week'],
-    ...report.instructors.map((i) => [i.name, i.sections, i.classes, i.hours])
+    ['Instructor', 'Department', 'Sections', 'Classes per week', 'Hours per week'],
+    ...report.instructors.map((i) => [i.name, i.departments.join(', '), i.sections, i.classes, i.hours])
   ]);
-  instructors['!cols'] = [{ wch: 32 }, { wch: 10 }, { wch: 16 }, { wch: 15 }];
+  instructors['!cols'] = [{ wch: 32 }, { wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, instructors, 'Instructors');
 
   if (report.clashes.length > 0) {
@@ -180,103 +217,175 @@ export function exportDepartmentReportExcel(report: DepartmentReport): void {
 
 // ---------- PDF ----------
 
-const BLUE: [number, number, number] = [21, 101, 192];
-const LIGHT: [number, number, number] = [236, 243, 252];
+type RGB = [number, number, number];
+const BLUE: RGB = [21, 101, 192];
+const DARK: RGB = [33, 33, 33];
+const MUTED: RGB = [110, 110, 110];
+const LIGHT: RGB = [240, 245, 252];
+const TONE: Record<'good' | 'warn' | 'info', RGB> = { good: [46, 125, 50], warn: [211, 47, 47], info: BLUE };
+
+function useColor(pct: number): RGB {
+  if (pct >= 75) return [211, 47, 47];
+  if (pct >= 40) return [245, 124, 0];
+  return [56, 142, 60];
+}
 
 type DocWithTable = jsPDF & { lastAutoTable?: { finalY: number } };
 
-function nextY(doc: DocWithTable, gap = 10): number {
-  const y = (doc.lastAutoTable?.finalY ?? 20) + gap;
-  if (y > doc.internal.pageSize.getHeight() - 30) {
-    doc.addPage();
-    return 18;
-  }
-  return y;
-}
-
-function heading(doc: jsPDF, text: string, y: number): number {
-  doc.setFontSize(13);
-  doc.setTextColor(...BLUE);
-  doc.text(text, 14, y);
-  doc.setTextColor(0);
-  return y + 3;
-}
+const MARGIN = 14;
 
 export function buildDepartmentReportPDF(report: DepartmentReport): jsPDF {
   const doc = new jsPDF({ orientation: 'landscape' }) as DocWithTable;
-  const dept = report.department;
-  const s = report.summary;
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const contentW = pageW - MARGIN * 2;
   const tableStyle = {
-    styles: { fontSize: 8, cellPadding: 1.8 },
-    headStyles: { fillColor: BLUE },
+    styles: { fontSize: 8.5, cellPadding: 2, textColor: DARK },
+    headStyles: { fillColor: BLUE, textColor: 255, fontStyle: 'bold' as const },
     alternateRowStyles: { fillColor: LIGHT },
-    margin: { left: 14, right: 14 }
+    margin: { left: MARGIN, right: MARGIN, top: 16, bottom: 16 }
   };
 
-  doc.setFontSize(18);
-  doc.text(`${dept} - Room Utilization Report`, 14, 18);
-  doc.setFontSize(10);
-  doc.setTextColor(90);
-  doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, 25);
-  doc.text(doc.splitTextToSize(methodNote(report), 265), 14, 31);
-  doc.setTextColor(0);
+  const ensureSpace = (y: number, needed: number): number => {
+    if (y + needed > pageH - 18) {
+      doc.addPage();
+      return 18;
+    }
+    return y;
+  };
+  const afterTable = () => (doc.lastAutoTable?.finalY ?? 0) + 10;
+  const heading = (text: string, y: number, sub?: string): number => {
+    y = ensureSpace(y, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...BLUE);
+    doc.text(text, MARGIN, y);
+    doc.setDrawColor(...BLUE);
+    doc.setLineWidth(0.4);
+    doc.line(MARGIN, y + 1.8, pageW - MARGIN, y + 1.8);
+    doc.setFont('helvetica', 'normal');
+    if (sub) {
+      doc.setFontSize(8.5);
+      doc.setTextColor(...MUTED);
+      doc.text(sub, MARGIN, y + 6.5);
+      return y + 9;
+    }
+    return y + 5;
+  };
 
+  // Header band
+  doc.setFillColor(...BLUE);
+  doc.rect(0, 0, pageW, 26, 'F');
+  doc.setTextColor(255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(19);
+  doc.text('Room Utilization Report', MARGIN, 12);
+  doc.setFont('helvetica', 'normal');
   doc.setFontSize(11);
-  const headline =
-    `${dept} teaches ${s.weeklyClasses} classes (${s.weeklyHours} hours) a week in ${s.rooms} rooms. ` +
-    `It uses ${s.departmentUtilization}% of those rooms' available time; with other departments included they are ` +
-    `${s.totalUtilization}% used. ${s.sharedRooms} of the ${s.rooms} rooms are shared with other departments.`;
-  doc.text(doc.splitTextToSize(headline, 265), 14, 42);
+  doc.text(titleDepartments(report), MARGIN, 20);
+  doc.setFontSize(9);
+  doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - MARGIN, 12, { align: 'right' });
 
-  autoTable(doc, {
-    ...tableStyle,
-    startY: 54,
-    head: [['Measure', 'Value']],
-    body: summaryRows(report),
-    tableWidth: 150,
-    styles: { fontSize: 9, cellPadding: 2 }
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(doc.splitTextToSize(methodNote(report), contentW), MARGIN, 32);
+
+  // Key figure tiles
+  const figures = keyFigures(report);
+  const gap = 4;
+  const tileW = (contentW - gap * (figures.length - 1)) / figures.length;
+  const tileY = 40;
+  figures.forEach(([value, label], i) => {
+    const x = MARGIN + i * (tileW + gap);
+    doc.setFillColor(...LIGHT);
+    doc.roundedRect(x, tileY, tileW, 22, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(17);
+    doc.setTextColor(...BLUE);
+    doc.text(value, x + tileW / 2, tileY + 10, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...MUTED);
+    doc.text(doc.splitTextToSize(label, tileW - 4), x + tileW / 2, tileY + 16, { align: 'center' });
   });
 
+  // Key findings
+  let y = heading('Key findings', tileY + 32);
+  y += 2;
+  doc.setFontSize(9.5);
+  report.findings.forEach((f) => {
+    const lines = doc.splitTextToSize(f.text, contentW - 8);
+    y = ensureSpace(y, lines.length * 4.6 + 2);
+    doc.setFillColor(...TONE[f.tone]);
+    doc.circle(MARGIN + 1.8, y - 1.2, 1.2, 'F');
+    doc.setTextColor(...DARK);
+    doc.text(lines, MARGIN + 6, y);
+    y += lines.length * 4.6 + 1.6;
+  });
+
+  // By department
   autoTable(doc, {
     ...tableStyle,
-    startY: heading(doc, 'Room by room', nextY(doc, 12)),
-    head: [['Room', `${dept} h`, 'Other h', 'Free h', `${dept} use`, 'Total use', `${dept} share`, 'Shared with']],
+    startY: heading('By department', y + 6, '"Own rooms" = rooms no other department teaches in.'),
+    head: [DEPARTMENT_HEADER],
+    body: departmentRows(report),
+    columnStyles: { 0: { fontStyle: 'bold' } }
+  });
+
+  // Own vs shared rooms
+  autoTable(doc, {
+    ...tableStyle,
+    startY: heading('Own rooms vs shared rooms', afterTable()),
+    head: [groupHeader(report)],
+    body: roomGroupRows(report),
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 }, 6: { cellWidth: 95 } },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.row.index === 2) data.cell.styles.fontStyle = 'bold';
+    }
+  });
+
+  // Room by room, busiest first, with a usage bar
+  const USE_COL = 5;
+  autoTable(doc, {
+    ...tableStyle,
+    startY: heading('Room by room', afterTable(), 'Sorted from most to least used. Hours are per week.'),
+    head: [['Room', 'Status', report.departments.length === 1 ? `${report.label} hrs` : 'Selected depts (hrs)', 'Other departments (hrs)', 'Free hrs', 'Total use']],
     body: report.rooms.map((r) => [
-      r.room, r.departmentHours, r.otherHoursTotal, r.freeHours,
-      `${r.departmentUtilization}%`, `${r.totalUtilization}%`, `${r.departmentShare}%`,
-      sharedWithText(r) || `Only ${dept}`
+      r.room,
+      roomStatus(report, r),
+      report.departments.length === 1 ? String(r.selectedHours) : hoursText(r.hoursByDepartment),
+      hoursText(r.otherHours) || '-',
+      r.freeHours,
+      `${r.totalUtilization}%`
     ]),
-    columnStyles: { 7: { cellWidth: 110 } }
-  });
-
-  if (report.otherMeetings.length > 0) {
-    autoTable(doc, {
-      ...tableStyle,
-      startY: heading(doc, `Other departments' classes in ${dept} rooms`, nextY(doc, 12)),
-      head: [['Room', 'Department', 'Course', 'Course Name', 'Sec', 'Day', 'Time', 'Instructor']],
-      body: report.otherMeetings.map((m) => [m.room, m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.teacher])
-    });
-  }
-
-  autoTable(doc, {
-    ...tableStyle,
-    startY: heading(doc, `${dept} classes`, nextY(doc, 12)),
-    head: [['Course', 'Course Name', 'Sec', 'Day', 'Time', 'Room', 'Instructor']],
-    body: [...report.meetings].sort(byCourse).map((m) => [m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.room, m.teacher])
-  });
-
-  autoTable(doc, {
-    ...tableStyle,
-    startY: heading(doc, 'Instructors', nextY(doc, 12)),
-    head: [['Instructor', 'Sections', 'Classes / week', 'Hours / week']],
-    body: report.instructors.map((i) => [i.name, i.sections, i.classes, i.hours]),
-    tableWidth: 150
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 18 },
+      1: { cellWidth: 36 },
+      4: { cellWidth: 16 },
+      [USE_COL]: { cellWidth: 62, fontStyle: 'bold' }
+    },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.column.index === USE_COL) {
+        data.cell.styles.textColor = useColor(parseFloat(String(data.cell.raw)));
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section !== 'body' || data.column.index !== USE_COL) return;
+      const pctValue = parseFloat(String(data.cell.raw)) || 0;
+      const barX = data.cell.x + 17;
+      const barW = data.cell.width - 20;
+      const barY = data.cell.y + data.cell.height / 2 - 1.5;
+      doc.setFillColor(225, 225, 225);
+      doc.rect(barX, barY, barW, 3, 'F');
+      doc.setFillColor(...useColor(pctValue));
+      doc.rect(barX, barY, (barW * Math.min(pctValue, 100)) / 100, 3, 'F');
+    }
   });
 
   if (report.clashes.length > 0) {
     autoTable(doc, {
       ...tableStyle,
-      startY: heading(doc, 'Room clashes / combined classes (same room, overlapping time)', nextY(doc, 12)),
+      startY: heading('Time clashes', afterTable(), 'Two classes booked in the same room at overlapping times.'),
       head: [['Room', 'Day', 'Class 1', 'Time 1', 'Department 1', 'Class 2', 'Time 2', 'Department 2']],
       body: report.clashes.map((c) => [
         c.room, c.day,
@@ -286,12 +395,45 @@ export function buildDepartmentReportPDF(report: DepartmentReport): jsPDF {
     });
   }
 
+  // ----- Details (start on a new page) -----
+  doc.addPage();
+  y = 18;
+  if (report.otherMeetings.length > 0) {
+    autoTable(doc, {
+      ...tableStyle,
+      startY: heading('Other departments in these rooms', y, 'Classes of departments not in this report that use the same rooms.'),
+      head: [['Room', 'Department', 'Course', 'Course Name', 'Sec', 'Day', 'Time', 'Instructor']],
+      body: report.otherMeetings.map((m) => [m.room, m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.teacher])
+    });
+    y = afterTable();
+  }
+
+  autoTable(doc, {
+    ...tableStyle,
+    startY: heading('Instructors', y),
+    head: [['Instructor', 'Department', 'Sections', 'Classes / week', 'Hours / week']],
+    body: report.instructors.map((i) => [i.name, i.departments.join(', '), i.sections, i.classes, i.hours])
+  });
+
+  report.departments.forEach((dept) => {
+    const rows = report.meetings.filter((m) => m.department === dept).sort(byCourse);
+    if (rows.length === 0) return;
+    autoTable(doc, {
+      ...tableStyle,
+      startY: heading(`${dept} classes`, afterTable(), `${rows.length} classes per week`),
+      head: [['Course', 'Course Name', 'Sec', 'Day', 'Time', 'Room', 'Instructor']],
+      body: rows.map((m) => [m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.room, m.teacher]),
+      columnStyles: { 0: { fontStyle: 'bold' } }
+    });
+  });
+
   const pages = doc.getNumberOfPages();
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
     doc.setFontSize(8);
-    doc.setTextColor(140);
-    doc.text(`${dept} room utilization - page ${p} of ${pages}`, 14, doc.internal.pageSize.getHeight() - 8);
+    doc.setTextColor(150);
+    doc.text(`Room Utilization Report - ${titleDepartments(report)}`, MARGIN, pageH - 8);
+    doc.text(`Page ${p} of ${pages}`, pageW - MARGIN, pageH - 8, { align: 'right' });
   }
 
   return doc;

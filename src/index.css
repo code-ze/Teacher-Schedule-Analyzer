@@ -522,6 +522,50 @@ body {
 .department-report-headline { margin: 16px 0 6px; font-size: 1.05em; line-height: 1.5; color: #333; }
 .department-report-note { margin: 0 0 14px; font-size: 0.85em; color: #666; }
 
+.department-report-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.department-report-picker-label { font-weight: 600; color: #1565c0; margin-right: 4px; }
+
+.department-report-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid #90caf9;
+  border-radius: 18px;
+  background: white;
+  cursor: pointer;
+  font-size: 0.9em;
+  user-select: none;
+}
+
+.department-report-chip.selected { background: #1565c0; border-color: #1565c0; color: white; }
+.department-report-chip input { margin: 0; accent-color: #0d47a1; }
+
+.department-report-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.department-report-group {
+  background: white;
+  border: 1px solid #bbdefb;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.department-report-group-name { font-weight: 600; color: #0d47a1; }
+.department-report-group-value { font-size: 1.8em; font-weight: 700; margin: 2px 0; }
+.department-report-group-meta { font-size: 0.85em; color: #666; }
+
 .department-report-table {
   width: 100%;
   border-collapse: collapse;
@@ -538,6 +582,7 @@ body {
 }
 
 .department-report-table td { padding: 8px 12px; border-bottom: 1px solid #e0e0e0; }
+
 
 /* ── Teacher schedules ─────────────────────────────────────── */
 .teacher-card {
