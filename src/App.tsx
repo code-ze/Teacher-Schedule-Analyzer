@@ -9,6 +9,9 @@ import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
 import VirtualRoomsPanel from './components/VirtualRoomsPanel';
 import { loadVirtualRooms, saveVirtualRooms } from './utils/virtualRooms';
+import AssignedRoomsPanel from './components/AssignedRoomsPanel';
+import { loadAssignedRooms, saveAssignedRooms } from './utils/assignedRooms';
+import type { AssignedRoom } from './utils/departmentReport';
 import { useScheduleData } from './hooks/useScheduleData';
 import { TABS, type TabId } from './tabs';
 
@@ -17,6 +20,11 @@ export default function App() {
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('overview');
   const [virtualRooms, setVirtualRooms] = useState<string[]>(loadVirtualRooms);
+  const [assignedRooms, setAssignedRooms] = useState<AssignedRoom[]>(loadAssignedRooms);
+  const updateAssignedRooms = (rooms: AssignedRoom[]) => {
+    setAssignedRooms(rooms);
+    saveAssignedRooms(rooms);
+  };
   const updateVirtualRooms = (rooms: string[]) => {
     setVirtualRooms(rooms);
     saveVirtualRooms(rooms);
@@ -113,10 +121,17 @@ export default function App() {
                 virtualRooms={virtualRooms}
                 onChange={updateVirtualRooms}
               />
+              <AssignedRoomsPanel
+                departments={data.departments}
+                roomNames={Object.keys(data.classrooms)}
+                assignedRooms={assignedRooms}
+                onChange={updateAssignedRooms}
+              />
               <ClassroomsSection
                 classrooms={data.classrooms}
                 virtualRooms={virtualRooms}
                 onToggleVirtual={toggleVirtualRoom}
+                assignedRooms={assignedRooms}
               />
             </div>
             <div hidden={tab !== 'report'}>
@@ -124,6 +139,7 @@ export default function App() {
                 courses={data.courses}
                 departments={data.departments}
                 virtualRooms={virtualRooms}
+                assignedRooms={assignedRooms}
                 onManageVirtualRooms={() => openTab('rooms')}
               />
             </div>
