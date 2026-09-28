@@ -834,3 +834,59 @@ select { cursor: pointer; padding-right: 8px; }
 /* An opened room spans the full row; lay its days out side by side. */
 .classroom-card.open .daily-schedule { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 4px 24px; }
 .classroom-card.open .occupancy-stats { max-width: 420px; }
+
+/* Virtual / online rooms */
+.virtual-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.virtual-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+.virtual-chip button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.virtual-chip button:hover { background: var(--border); color: var(--text); }
+.suggestion-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px dashed var(--amber-line);
+  background: var(--amber-soft);
+  border-radius: var(--radius-sm);
+}
+.suggestion > div { flex: 1 1 300px; min-width: 0; }
+.virtual-rooms-panel input[type='search'] { flex: 0 1 260px; }
+.virtual-badge { background: #f1f5f9; color: #475569; }
+.classroom-card.virtual { background: repeating-linear-gradient(135deg, #fff, #fff 10px, #f8fafc 10px, #f8fafc 20px); }
+.classroom-card.virtual .occupancy-fill { background: #cbd5e1 !important; }
+.virtual-toggle { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.virtual-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 8px 0 6px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.88em;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }

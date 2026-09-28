@@ -41,16 +41,28 @@ function withOccupancy(classrooms: Record<string, Classroom>): Classroom[] {
   });
 }
 
-function ClassroomCard({ classroom }: { classroom: Classroom }) {
+interface CardProps {
+  classroom: Classroom;
+  isVirtual: boolean;
+  onToggleVirtual?: (room: string) => void;
+}
+
+function ClassroomCard({ classroom, isVirtual, onToggleVirtual }: CardProps) {
   const [open, setOpen] = useState(false);
   const departments = Array.from(classroom.departments).sort((a, b) => a.localeCompare(b));
   const pct = classroom.occupancyPercentage ?? 0;
 
   return (
-    <div className={`classroom-card${open ? ' open' : ''}`}>
+    <div className={`classroom-card${open ? ' open' : ''}${isVirtual ? ' virtual' : ''}`}>
       <button className="classroom-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <span className="classroom-name">{classroom.name}</span>
-        <span className={`occupancy-badge occupancy-${classroom.occupancyCategory}`}>{pct}%</span>
+        {isVirtual ? (
+          <span className="occupancy-badge virtual-badge" title="Marked as a virtual / online room: not counted in utilization">
+            💻 Virtual
+          </span>
+        ) : (
+          <span className={`occupancy-badge occupancy-${classroom.occupancyCategory}`}>{pct}%</span>
+        )}
         <span className="classroom-summary">
           {classroom.totalClasses} classes · {departments.join(', ') || 'No department'}
         </span>
@@ -63,6 +75,14 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
       </button>
       {open && (
         <div className="classroom-details">
+          {onToggleVirtual && (
+            <div className="virtual-toggle">
+              <button className="btn-outline" onClick={() => onToggleVirtual(classroom.name)}>
+                {isVirtual ? '🏫 Mark as a real room' : '💻 Mark as virtual / online room'}
+              </button>
+              {isVirtual && <span className="muted">Not counted in utilization or reports.</span>}
+            </div>
+          )}
           {departments.length > 0 && (
             <div className="classroom-departments">
               <span className="departments-label">🏛️ Departments using this room:</span>
@@ -136,9 +156,23 @@ function ClassroomCard({ classroom }: { classroom: Classroom }) {
   );
 }
 
-export default function ClassroomsSection({ classrooms }: { classrooms: Record<string, Classroom> }) {
+interface Props {
+  classrooms: Record<string, Classroom>;
+  /** Placeholder rooms for online classes: shown, but left out of utilization. */
+  virtualRooms?: string[];
+  onToggleVirtual?: (room: string) => void;
+}
+
+export default function ClassroomsSection({ classrooms, virtualRooms = [], onToggleVirtual }: Props) {
+  const virtualSet = useMemo(() => new Set(virtualRooms), [virtualRooms]);
   const allClassrooms = useMemo(() => withOccupancy(classrooms), [classrooms]);
-  const departmentStats = useMemo(() => computeDepartmentUtilization(classrooms), [classrooms]);
+  const departmentStats = useMemo(
+    () =>
+      computeDepartmentUtilization(
+        Object.fromEntries(Object.entries(classrooms).filter(([name]) => !virtualSet.has(name)))
+      ),
+    [classrooms, virtualSet]
+  );
 
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);
   const toggleDept = (dept: string) =>
@@ -162,8 +196,13 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
     if (terms.length > 0) {
       list = list.filter((c) => terms.some((t) => c.name.toLowerCase().includes(t)));
     }
-    return [...list].sort((a, b) => (b.occupancyPercentage ?? 0) - (a.occupancyPercentage ?? 0));
-  }, [allClassrooms, selectedDepts, roomSearch]);
+    // Virtual rooms go last: their percentage isn't a real occupancy.
+    return [...list].sort(
+      (a, b) =>
+        Number(virtualSet.has(a.name)) - Number(virtualSet.has(b.name)) ||
+        (b.occupancyPercentage ?? 0) - (a.occupancyPercentage ?? 0)
+    );
+  }, [allClassrooms, selectedDepts, roomSearch, virtualSet]);
 
   const buildingResults: BuildingCourseRow[] = useMemo(() => {
     const prefix = buildingSearch.trim().toLowerCase();
@@ -273,10 +312,10 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
             </p>
           </div>
           <div className="panel-actions">
-            <button className="export-pdf-btn" onClick={() => exportClassroomsPDF(filteredClassrooms)}>
+            <button className="export-pdf-btn" onClick={() => exportClassroomsPDF(filteredClassrooms, virtualSet)}>
               📄 PDF
             </button>
-            <button className="export-excel-btn" onClick={() => exportClassroomsExcel(filteredClassrooms)}>
+            <button className="export-excel-btn" onClick={() => exportClassroomsExcel(filteredClassrooms, virtualSet)}>
               📊 Excel
             </button>
           </div>
@@ -328,7 +367,9 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
             value={buildingSearch}
             onChange={(e) => setBuildingSearch(e.target.value)}
           />
-          <span className="muted">{filteredClassrooms.length} rooms found</span>
+          <span className="muted">
+            {filteredClassrooms.length} {filteredClassrooms.length === 1 ? 'room' : 'rooms'} found
+          </span>
         </div>
 
         {buildingPrefix && (
@@ -388,7 +429,12 @@ export default function ClassroomsSection({ classrooms }: { classrooms: Record<s
         ) : (
           <div className="classroom-grid">
             {visibleRooms.map((classroom) => (
-              <ClassroomCard classroom={classroom} key={classroom.name} />
+              <ClassroomCard
+                classroom={classroom}
+                key={classroom.name}
+                isVirtual={virtualSet.has(classroom.name)}
+                onToggleVirtual={onToggleVirtual}
+              />
             ))}
           </div>
         )}

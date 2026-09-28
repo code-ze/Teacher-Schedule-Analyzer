@@ -6,14 +6,26 @@ import MeetingFinder from './components/MeetingFinder';
 import ClassroomsSection from './components/ClassroomsSection';
 import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
+import VirtualRoomsPanel from './components/VirtualRoomsPanel';
+import { loadVirtualRooms, saveVirtualRooms } from './utils/virtualRooms';
 import { useScheduleData } from './hooks/useScheduleData';
 import { TABS, type TabId } from './tabs';
-
 
 export default function App() {
   const { data, loading, error, fileNames, loadFiles } = useScheduleData();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('overview');
+  const [virtualRooms, setVirtualRooms] = useState<string[]>(loadVirtualRooms);
+  const updateVirtualRooms = (rooms: string[]) => {
+    setVirtualRooms(rooms);
+    saveVirtualRooms(rooms);
+  };
+  const toggleVirtualRoom = (room: string) =>
+    updateVirtualRooms(
+      virtualRooms.includes(room)
+        ? virtualRooms.filter((r) => r !== room)
+        : [...virtualRooms, room].sort((a, b) => a.localeCompare(b))
+    );
   const hasData = !loading && !!data && data.totalClasses > 0;
 
   const openTab = (id: TabId) => {
@@ -91,10 +103,25 @@ export default function App() {
               <MeetingFinder teachers={data.teachers} />
             </div>
             <div hidden={tab !== 'rooms'}>
-              <ClassroomsSection classrooms={data.classrooms} />
+              <VirtualRoomsPanel
+                courses={data.courses}
+                roomNames={Object.keys(data.classrooms).sort((a, b) => a.localeCompare(b))}
+                virtualRooms={virtualRooms}
+                onChange={updateVirtualRooms}
+              />
+              <ClassroomsSection
+                classrooms={data.classrooms}
+                virtualRooms={virtualRooms}
+                onToggleVirtual={toggleVirtualRoom}
+              />
             </div>
             <div hidden={tab !== 'report'}>
-              <DepartmentReportSection courses={data.courses} departments={data.departments} />
+              <DepartmentReportSection
+                courses={data.courses}
+                departments={data.departments}
+                virtualRooms={virtualRooms}
+                onManageVirtualRooms={() => openTab('rooms')}
+              />
             </div>
             <div hidden={tab !== 'instructors'}>
               <TeacherSchedules teachers={data.teachers} />
