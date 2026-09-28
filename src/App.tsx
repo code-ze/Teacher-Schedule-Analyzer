@@ -7,6 +7,7 @@ import MeetingFinder from './components/MeetingFinder';
 import ClassroomsSection from './components/ClassroomsSection';
 import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
+import SpaceReportSection from './components/SpaceReportSection';
 import VirtualRoomsPanel from './components/VirtualRoomsPanel';
 import { loadVirtualRooms, saveVirtualRooms } from './utils/virtualRooms';
 import AssignedRoomsPanel from './components/AssignedRoomsPanel';
@@ -142,6 +143,9 @@ export default function App() {
                 assignedRooms={assignedRooms}
                 onManageVirtualRooms={() => openTab('rooms')}
               />
+            </div>
+            <div hidden={tab !== 'space'}>
+              <SpaceReportSection courses={data.courses} departments={data.departments} timetableName={fileNames.join(', ')} />
             </div>
             <div hidden={tab !== 'instructors'}>
               <TeacherSchedules teachers={data.teachers} />

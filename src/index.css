@@ -896,3 +896,37 @@ select { cursor: pointer; padding-right: 8px; }
 .section-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
 .section-card-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .section-card .data-table td, .section-card .data-table th { padding: 7px 12px; }
+
+/* Space report */
+.space-steps { display: flex; flex-direction: column; gap: 16px; }
+.space-step { border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--surface-2); }
+.space-step .filter-label { display: block; margin-bottom: 8px; }
+.mini-drop {
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.93em;
+  transition: border-color 0.15s, background 0.15s;
+}
+.mini-drop:hover, .mini-drop.dragover { border-color: var(--accent); background: var(--accent-soft); }
+.facts-list { margin: 0; padding-left: 18px; font-size: 0.9em; line-height: 1.7; color: var(--text-2); }
+.spinner-inline {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.space-optional > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 4px; }
+.space-optional > summary::-webkit-details-marker { display: none; }
+.space-optional > summary::before { content: '▸'; color: var(--muted); margin-right: 6px; transition: transform 0.15s; }
+.space-optional[open] > summary::before { transform: rotate(90deg); }
+.space-optional[open] > summary { margin-bottom: 10px; }
+.space-optional > summary .filter-label { display: inline; margin: 0; }
