@@ -34,7 +34,10 @@ function methodNote(report: DepartmentReport): string {
   return (
     `Available time = ${report.days.length} teaching days (${report.days.join(', ')}) x 8 hours (08:00-16:00) = ` +
     `${report.capacityPerRoom} hours per room per week. Utilization = booked hours / available hours. ` +
-    `1 hour = 12.5% of a room's day (${hourShareOfWeek(report)}% of its week).`
+    `1 hour = 12.5% of a room's day (${hourShareOfWeek(report)}% of its week).` +
+    (report.virtualRooms.length
+      ? ` Virtual / online rooms (${report.virtualRooms.join(', ')}) are excluded from all room figures.`
+      : '')
   );
 }
 
@@ -63,8 +66,10 @@ function roomStatus(report: DepartmentReport, r: RoomUsage): string {
 
 function keyFigures(report: DepartmentReport): [string, string][] {
   const s = report.summary;
+  const online = s.onlineClasses > 0;
   return [
-    [String(s.weeklyClasses), 'Classes / week'],
+    [String(s.weeklyClasses), online ? 'Classes in rooms / week' : 'Classes / week'],
+    ...(online ? ([[String(s.onlineClasses), 'Online classes (virtual rooms)']] as [string, string][]) : []),
     [String(s.weeklyHours), 'Teaching hours / week'],
     [String(s.rooms), 'Rooms used'],
     [`${s.totalUtilization}%`, 'Room use (all depts)'],
@@ -97,11 +102,12 @@ function departmentRows(report: DepartmentReport): (string | number)[][] {
     d.ownRooms.rooms.length,
     d.ownRooms.rooms.length ? `${d.ownRooms.totalUtilization}%` : '-',
     d.sharedRooms.rooms.length,
-    d.sharedRooms.rooms.length ? `${d.sharedRooms.departmentShare}%` : '-'
+    d.sharedRooms.rooms.length ? `${d.sharedRooms.departmentShare}%` : '-',
+    d.onlineClasses ? `${d.onlineClasses} (${d.onlineHours}h)` : '-'
   ]);
 }
 
-const DEPARTMENT_HEADER = ['Department', 'Classes / wk', 'Hours / wk', 'Instructors', 'Rooms', 'Own rooms', 'Own rooms used', 'Shared rooms', 'Its share of shared rooms'];
+const DEPARTMENT_HEADER = ['Department', 'Classes / wk', 'Hours / wk', 'Instructors', 'Rooms', 'Own rooms', 'Own rooms used', 'Shared rooms', 'Its share of shared rooms', 'Online classes'];
 function groupHeader(report: DepartmentReport): string[] {
   const who = report.departments.length === 1 ? report.label : 'Selected depts';
   return ['Rooms', 'Count', `${who} hrs`, 'Other depts hrs', 'Free hrs', 'Use', 'Room list'];
@@ -194,6 +200,17 @@ export function buildDepartmentReportWorkbook(report: DepartmentReport): XLSX.Wo
   ]);
   instructors['!cols'] = [{ wch: 32 }, { wch: 28 }, { wch: 10 }, { wch: 16 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, instructors, 'Instructors');
+
+  if (report.virtualMeetings.length > 0) {
+    const online = XLSX.utils.aoa_to_sheet([
+      ['These classes are in rooms marked as virtual / online and are not counted in any room figure.'],
+      [],
+      ['Virtual room', 'Department', 'Course', 'Course Name', 'Section', 'Day', 'Time', 'Hours', 'Instructor'],
+      ...report.virtualMeetings.map((m) => [m.room, m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.hours, m.teacher])
+    ]);
+    online['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 11 }, { wch: 44 }, { wch: 8 }, { wch: 11 }, { wch: 12 }, { wch: 7 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, online, 'Online Classes');
+  }
 
   if (report.clashes.length > 0) {
     const clashes = XLSX.utils.aoa_to_sheet([
@@ -414,6 +431,19 @@ export function buildDepartmentReportPDF(report: DepartmentReport): jsPDF {
     head: [['Instructor', 'Department', 'Sections', 'Classes / week', 'Hours / week']],
     body: report.instructors.map((i) => [i.name, i.departments.join(', '), i.sections, i.classes, i.hours])
   });
+
+  if (report.virtualMeetings.length > 0) {
+    autoTable(doc, {
+      ...tableStyle,
+      startY: heading(
+        'Online / virtual room classes',
+        afterTable(),
+        `${report.virtualMeetings.length} classes in rooms marked as virtual (${report.virtualRooms.join(', ')}); not counted in any room figure.`
+      ),
+      head: [['Virtual room', 'Department', 'Course', 'Course Name', 'Sec', 'Day', 'Time', 'Instructor']],
+      body: report.virtualMeetings.map((m) => [m.room, m.department, m.code, m.courseName, m.section, m.day, `${m.startTime}-${m.endTime}`, m.teacher])
+    });
+  }
 
   report.departments.forEach((dept) => {
     const rows = report.meetings.filter((m) => m.department === dept).sort(byCourse);

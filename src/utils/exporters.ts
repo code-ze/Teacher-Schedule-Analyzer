@@ -28,11 +28,12 @@ function capitalize(s: string | undefined): string {
 
 // ---------- Classroom occupancy ----------
 
-export function exportClassroomsExcel(classrooms: Classroom[]): void {
+export function exportClassroomsExcel(classrooms: Classroom[], virtualRooms: Set<string> = new Set()): void {
   const wb = XLSX.utils.book_new();
 
   const dayHeaders = WORK_DAYS.map((d) => `${d} (%)`);
   const summaryHeaders = ['Room', 'Occupancy %', 'Category', 'Total Classes', 'Departments', ...dayHeaders];
+  const category = (c: Classroom) => (virtualRooms.has(c.name) ? 'Virtual / online room' : capitalize(c.occupancyCategory));
   const summaryRows = classrooms.map((classroom) => {
     const dailyOccupancy = WORK_DAYS.map((day) => {
       const count = DISPLAY_HOURS.filter((h) => classroom.schedule[day]?.[h]?.isOccupied).length;
@@ -41,7 +42,7 @@ export function exportClassroomsExcel(classrooms: Classroom[]): void {
     return [
       classroom.name,
       parseFloat(String(classroom.occupancyPercentage ?? 0)),
-      capitalize(classroom.occupancyCategory),
+      category(classroom),
       classroom.totalClasses,
       Array.from(classroom.departments).sort().join(', '),
       ...dailyOccupancy
@@ -87,7 +88,7 @@ export function exportClassroomsExcel(classrooms: Classroom[]): void {
   XLSX.writeFile(wb, `classroom-occupancy-${today()}.xlsx`);
 }
 
-export function exportClassroomsPDF(classrooms: Classroom[]): void {
+export function exportClassroomsPDF(classrooms: Classroom[], virtualRooms: Set<string> = new Set()): void {
   const doc = new jsPDF();
   doc.setFontSize(18);
   doc.text('Classroom Occupancy Report', 14, 20);
@@ -101,7 +102,7 @@ export function exportClassroomsPDF(classrooms: Classroom[]): void {
     body: classrooms.map((c) => [
       c.name,
       `${c.occupancyPercentage ?? 0}%`,
-      capitalize(c.occupancyCategory),
+      virtualRooms.has(c.name) ? 'Virtual / online' : capitalize(c.occupancyCategory),
       c.totalClasses,
       Array.from(c.departments).sort().join(', ')
     ]),

@@ -24,15 +24,18 @@ function hoursText(hours: Record<string, number>): string {
 interface Props {
   courses: Record<string, CourseSection>;
   departments: string[];
+  /** Placeholder rooms for online classes, excluded from room figures. */
+  virtualRooms?: string[];
+  onManageVirtualRooms?: () => void;
 }
 
-export default function DepartmentReportSection({ courses, departments }: Props) {
+export default function DepartmentReportSection({ courses, departments, virtualRooms = [], onManageVirtualRooms }: Props) {
   const [selected, setSelected] = useState<string[]>(() =>
     departments.includes('Design') ? ['Design'] : departments.slice(0, 1)
   );
   const report = useMemo(
-    () => (selected.length > 0 ? buildDepartmentReport(courses, selected) : null),
-    [courses, selected]
+    () => (selected.length > 0 ? buildDepartmentReport(courses, selected, { virtualRooms }) : null),
+    [courses, selected, virtualRooms]
   );
 
   if (departments.length === 0) return null;
@@ -88,7 +91,25 @@ export default function DepartmentReportSection({ courses, departments }: Props)
             week in {s.rooms} rooms. These rooms are <strong>{s.totalUtilization}%</strong> used, and{' '}
             {single ? selected[0] : 'the selected departments'} {single ? 'has' : 'have'}{' '}
             <strong>{s.selectedShare}%</strong> of the booked time.
+            {s.onlineClasses > 0 && (
+              <>
+                {' '}
+                Another <strong>{s.onlineClasses} online classes</strong> ({s.onlineHours} hours) are in virtual rooms and
+                are not counted.
+              </>
+            )}
           </p>
+          <div className="virtual-note">
+            <span>
+              💻 Virtual / online rooms excluded:{' '}
+              {virtualRooms.length ? <strong>{virtualRooms.join(', ')}</strong> : <span className="muted">none marked</span>}
+            </span>
+            {onManageVirtualRooms && (
+              <button className="btn-link" onClick={onManageVirtualRooms}>
+                Manage virtual rooms
+              </button>
+            )}
+          </div>
           <p className="department-report-note">
             Available time = {report.days.length} days × 8 hours (08:00–16:00) = {report.capacityPerRoom} hours per
             room per week. <strong>1 hour = 12.5% of a room's day</strong> ({hourShareOfWeek(report)}% of its week).
@@ -107,7 +128,8 @@ export default function DepartmentReportSection({ courses, departments }: Props)
                   <th>Own rooms</th>
                   <th>Own rooms used</th>
                   <th>Shared rooms</th>
-                  <th>Its share of shared rooms</th>
+                  <th>Share of shared rooms</th>
+                  <th>Online classes</th>
                 </tr>
               </thead>
               <tbody>
@@ -123,6 +145,7 @@ export default function DepartmentReportSection({ courses, departments }: Props)
                     </td>
                     <td>{d.sharedRooms.rooms.length}</td>
                     <td>{d.sharedRooms.rooms.length ? `${d.sharedRooms.departmentShare}%` : '–'}</td>
+                    <td>{d.onlineClasses ? `${d.onlineClasses} (${d.onlineHours}h)` : '–'}</td>
                   </tr>
                 ))}
               </tbody>

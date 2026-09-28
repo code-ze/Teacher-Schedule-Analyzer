@@ -58,6 +58,9 @@ export interface DepartmentSummary {
   weeklyHours: number;
   instructors: number;
   rooms: number;
+  /** Classes / hours held in rooms marked as virtual (online). Not in weeklyClasses. */
+  onlineClasses: number;
+  onlineHours: number;
   /** Rooms no other department (selected or not) teaches in. */
   ownRooms: RoomGroupTotals;
   /** Rooms this department shares with any other department. */
@@ -93,8 +96,12 @@ export interface DepartmentReport {
   summary: {
     courses: number;
     sections: number;
+    /** Classes and hours in real rooms (virtual rooms excluded). */
     weeklyClasses: number;
     weeklyHours: number;
+    /** Classes and hours in rooms marked as virtual / online. */
+    onlineClasses: number;
+    onlineHours: number;
     instructors: number;
     rooms: number;
     capacityHours: number;
@@ -110,6 +117,10 @@ export interface DepartmentReport {
   byDepartment: DepartmentSummary[];
   findings: Finding[];
   meetings: ReportMeeting[];
+  /** Selected departments' classes in virtual rooms, kept out of every room figure. */
+  virtualMeetings: ReportMeeting[];
+  /** Virtual rooms the selected departments use. */
+  virtualRooms: string[];
   rooms: RoomUsage[];
   otherMeetings: ReportMeeting[];
   clashes: RoomClash[];
@@ -246,6 +257,14 @@ function buildFindings(report: Omit<DepartmentReport, 'findings'>): Finding[] {
       text: `${report.clashes.length} time clash(es): two classes booked in the same room at the same time (see the Clashes table).`
     });
   }
+  if (report.virtualMeetings.length) {
+    findings.push({
+      tone: 'info',
+      text:
+        `${report.summary.onlineClasses} online class(es) (${report.summary.onlineHours}h a week) are in virtual rooms ` +
+        `(${report.virtualRooms.join(', ')}) and are not counted in any room figure (see "Online / virtual room classes").`
+    });
+  }
   findings.push({
     tone: 'info',
     text: `Each room has ${capacityPerRoom} hours a week available; 1 hour = 12.5% of a room's day.`
@@ -253,19 +272,30 @@ function buildFindings(report: Omit<DepartmentReport, 'findings'>): Finding[] {
   return findings;
 }
 
+export interface DepartmentReportOptions {
+  /** Placeholder rooms for online classes; left out of all room figures. */
+  virtualRooms?: string[];
+}
+
 export function buildDepartmentReport(
   courses: Record<string, CourseSection>,
-  departmentOrList: string | string[]
+  departmentOrList: string | string[],
+  options: DepartmentReportOptions = {}
 ): DepartmentReport {
   const departments = (Array.isArray(departmentOrList) ? departmentOrList : [departmentOrList])
     .slice()
     .sort((a, b) => a.localeCompare(b));
   const selected = new Set(departments);
   const label = departments.length === 1 ? departments[0] : 'Selected departments';
-  const meetings = allMeetings(courses);
+  const everyMeeting = allMeetings(courses);
+  const virtual = new Set(options.virtualRooms ?? []);
+  const meetings = everyMeeting.filter((m) => !virtual.has(m.room));
+  const virtualMeetings = everyMeeting
+    .filter((m) => virtual.has(m.room) && selected.has(m.department))
+    .sort((a, b) => a.department.localeCompare(b.department) || compareMeetings(a, b));
 
   // Capacity is counted over the days the timetable actually uses (e.g. Sun–Thu).
-  const days = WORK_DAYS.filter((day) => meetings.some((m) => m.day === day));
+  const days = WORK_DAYS.filter((day) => everyMeeting.some((m) => m.day === day));
   const capacityPerRoom = days.length * FULL_OCCUPANCY_HOURS;
 
   const selectedMeetings = meetings.filter((m) => selected.has(m.department)).sort(compareMeetings);
@@ -325,7 +355,7 @@ export function buildDepartmentReport(
   });
 
   const instructorMap: Record<string, { departments: Set<string>; sections: Set<string>; classes: number; hours: number }> = {};
-  selectedMeetings.forEach((m) => {
+  [...selectedMeetings, ...virtualMeetings].forEach((m) => {
     const entry = (instructorMap[m.teacher] ||= { departments: new Set(), sections: new Set(), classes: 0, hours: 0 });
     entry.departments.add(m.department);
     entry.sections.add(`${m.code}-${m.section}`);
@@ -344,6 +374,7 @@ export function buildDepartmentReport(
 
   const byDepartment: DepartmentSummary[] = departments.map((department) => {
     const own = selectedMeetings.filter((m) => m.department === department);
+    const online = virtualMeetings.filter((m) => m.department === department);
     const deptRooms = rooms.filter((r) => r.hoursByDepartment[department]);
     const isOwn = (r: RoomUsage) => r.usedBy.length === 1 && r.sharedWith.length === 0;
     const shared = deptRooms.filter((r) => !isOwn(r));
@@ -351,12 +382,14 @@ export function buildDepartmentReport(
     const departmentHours = sum(shared, (r) => r.hoursByDepartment[department]);
     return {
       department,
-      courses: new Set(own.map((m) => m.code)).size,
-      sections: new Set(own.map((m) => `${m.code}-${m.section}`)).size,
+      courses: new Set([...own, ...online].map((m) => m.code)).size,
+      sections: new Set([...own, ...online].map((m) => `${m.code}-${m.section}`)).size,
       weeklyClasses: own.length,
       weeklyHours: sum(own, (m) => m.hours),
-      instructors: new Set(own.map((m) => m.teacher)).size,
+      instructors: new Set([...own, ...online].map((m) => m.teacher)).size,
       rooms: deptRooms.length,
+      onlineClasses: online.length,
+      onlineHours: sum(online, (m) => m.hours),
       ownRooms: groupTotals(deptRooms.filter(isOwn), capacityPerRoom),
       sharedRooms: {
         ...sharedTotals,
@@ -376,10 +409,12 @@ export function buildDepartmentReport(
     days,
     capacityPerRoom,
     summary: {
-      courses: new Set(selectedMeetings.map((m) => `${m.department}|${m.code}`)).size,
-      sections: new Set(selectedMeetings.map((m) => `${m.department}|${m.code}-${m.section}`)).size,
+      courses: new Set([...selectedMeetings, ...virtualMeetings].map((m) => `${m.department}|${m.code}`)).size,
+      sections: new Set([...selectedMeetings, ...virtualMeetings].map((m) => `${m.department}|${m.code}-${m.section}`)).size,
       weeklyClasses: selectedMeetings.length,
       weeklyHours,
+      onlineClasses: virtualMeetings.length,
+      onlineHours: sum(virtualMeetings, (m) => m.hours),
       instructors: instructors.length,
       rooms: rooms.length,
       capacityHours,
@@ -393,6 +428,8 @@ export function buildDepartmentReport(
     sharedRooms: groupTotals(rooms.filter((r) => r.sharedWith.length > 0), capacityPerRoom),
     byDepartment,
     meetings: selectedMeetings,
+    virtualMeetings,
+    virtualRooms: Array.from(new Set(virtualMeetings.map((m) => m.room))).sort((a, b) => a.localeCompare(b)),
     rooms,
     otherMeetings,
     clashes,
