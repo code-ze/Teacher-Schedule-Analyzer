@@ -890,3 +890,9 @@ select { cursor: pointer; padding-right: 8px; }
   font-size: 0.88em;
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+/* Find a class */
+.section-list { display: flex; flex-direction: column; gap: 10px; }
+.section-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.section-card-header { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.section-card .data-table td, .section-card .data-table th { padding: 7px 12px; }
