@@ -1,12 +1,15 @@
 import { WORK_DAYS, DISPLAY_HOURS, FULL_OCCUPANCY_HOURS } from '../config';
 import type { Classroom, DepartmentUtilization } from '../types';
+import type { AssignedRoom } from './departmentReport';
 
 // Builds a per-department utilization summary from the classroom data:
 // for every department, find the rooms it uses, and measure how full
 // those rooms run (weekly average and single busiest day), so admins can
 // spot which departments are packed vs. which have slack room capacity.
 export function computeDepartmentUtilization(
-  classrooms: Record<string, Classroom>
+  classrooms: Record<string, Classroom>,
+  /** Rooms assigned to departments by the user; empty ones add free capacity. */
+  assignedRooms: AssignedRoom[] = []
 ): DepartmentUtilization[] {
   const byDepartment: Record<
     string,
@@ -39,6 +42,10 @@ export function computeDepartmentUtilization(
         entry.dailyHours[dayKey] = (entry.dailyHours[dayKey] || 0) + 1;
       });
     });
+  });
+
+  assignedRooms.forEach(({ room, departments }) => {
+    departments.forEach((dept) => byDepartment[dept]?.rooms.add(room));
   });
 
   // totalClasses (weekly meeting count) is easier to derive from courses upstream;

@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { WORK_DAYS, DISPLAY_HOURS, extractClassId } from '../config';
 import type { Classroom } from '../types';
 import { computeDepartmentUtilization } from '../utils/departmentUtilization';
+import { emptyClassroom } from '../utils/assignedRooms';
+import type { AssignedRoom } from '../utils/departmentReport';
 import {
   exportBuildingExcel,
   exportBuildingPDF,
@@ -64,7 +66,8 @@ function ClassroomCard({ classroom, isVirtual, onToggleVirtual }: CardProps) {
           <span className={`occupancy-badge occupancy-${classroom.occupancyCategory}`}>{pct}%</span>
         )}
         <span className="classroom-summary">
-          {classroom.totalClasses} classes · {departments.join(', ') || 'No department'}
+          {classroom.totalClasses === 0 ? 'No classes this semester' : `${classroom.totalClasses} classes`} ·{' '}
+          {departments.join(', ') || 'No department'}
         </span>
         <span className="occupancy-bar">
           <span
@@ -161,17 +164,33 @@ interface Props {
   /** Placeholder rooms for online classes: shown, but left out of utilization. */
   virtualRooms?: string[];
   onToggleVirtual?: (room: string) => void;
+  /** Rooms assigned to departments by the user; empty ones are shown with 0%. */
+  assignedRooms?: AssignedRoom[];
 }
 
-export default function ClassroomsSection({ classrooms, virtualRooms = [], onToggleVirtual }: Props) {
+export default function ClassroomsSection({
+  classrooms: scheduledClassrooms,
+  virtualRooms = [],
+  onToggleVirtual,
+  assignedRooms = []
+}: Props) {
   const virtualSet = useMemo(() => new Set(virtualRooms), [virtualRooms]);
+  // Add assigned rooms that have no classes in this file as empty rooms.
+  const classrooms = useMemo(() => {
+    const merged = { ...scheduledClassrooms };
+    assignedRooms.forEach((a) => {
+      if (!merged[a.room]) merged[a.room] = emptyClassroom(a);
+    });
+    return merged;
+  }, [scheduledClassrooms, assignedRooms]);
   const allClassrooms = useMemo(() => withOccupancy(classrooms), [classrooms]);
   const departmentStats = useMemo(
     () =>
       computeDepartmentUtilization(
-        Object.fromEntries(Object.entries(classrooms).filter(([name]) => !virtualSet.has(name)))
+        Object.fromEntries(Object.entries(classrooms).filter(([name]) => !virtualSet.has(name))),
+        assignedRooms.filter((a) => !virtualSet.has(a.room))
       ),
-    [classrooms, virtualSet]
+    [classrooms, virtualSet, assignedRooms]
   );
 
   const [selectedDepts, setSelectedDepts] = useState<string[]>([]);

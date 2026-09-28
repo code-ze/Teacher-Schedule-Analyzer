@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { CourseSection } from '../types';
-import { buildDepartmentReport } from '../utils/departmentReport';
+import { buildDepartmentReport, type AssignedRoom } from '../utils/departmentReport';
 import {
   exportDepartmentReportExcel,
   exportDepartmentReportPDF,
@@ -26,16 +26,24 @@ interface Props {
   departments: string[];
   /** Placeholder rooms for online classes, excluded from room figures. */
   virtualRooms?: string[];
+  /** Rooms assigned to departments by the user (e.g. empty this semester). */
+  assignedRooms?: AssignedRoom[];
   onManageVirtualRooms?: () => void;
 }
 
-export default function DepartmentReportSection({ courses, departments, virtualRooms = [], onManageVirtualRooms }: Props) {
+export default function DepartmentReportSection({
+  courses,
+  departments,
+  virtualRooms = [],
+  assignedRooms = [],
+  onManageVirtualRooms
+}: Props) {
   const [selected, setSelected] = useState<string[]>(() =>
     departments.includes('Design') ? ['Design'] : departments.slice(0, 1)
   );
   const report = useMemo(
-    () => (selected.length > 0 ? buildDepartmentReport(courses, selected, { virtualRooms }) : null),
-    [courses, selected, virtualRooms]
+    () => (selected.length > 0 ? buildDepartmentReport(courses, selected, { virtualRooms, assignedRooms }) : null),
+    [courses, selected, virtualRooms, assignedRooms]
   );
 
   if (departments.length === 0) return null;
@@ -106,10 +114,23 @@ export default function DepartmentReportSection({ courses, departments, virtualR
             </span>
             {onManageVirtualRooms && (
               <button className="btn-link" onClick={onManageVirtualRooms}>
-                Manage virtual rooms
+                Manage rooms
               </button>
             )}
           </div>
+          {report.rooms.some((r) => r.noClasses) && (
+            <div className="virtual-note">
+              <span>
+                🏫 Rooms with no classes this semester, included as free capacity:{' '}
+                <strong>
+                  {report.rooms
+                    .filter((r) => r.noClasses)
+                    .map((r) => r.room)
+                    .join(', ')}
+                </strong>
+              </span>
+            </div>
+          )}
           <p className="department-report-note">
             Available time = {report.days.length} days × 8 hours (08:00–16:00) = {report.capacityPerRoom} hours per
             room per week. <strong>1 hour = 12.5% of a room's day</strong> ({hourShareOfWeek(report)}% of its week).

@@ -35,8 +35,20 @@ export interface RoomUsage {
   selectedShare: number;
   selectedClasses: number;
   otherClasses: number;
+  /** Selected departments using the room (or assigned to it, if it has no classes). */
   usedBy: string[];
+  /** Non-selected departments using (or assigned to) the room. */
   sharedWith: string[];
+  /** Departments the user assigned this room to (see AssignedRoom). */
+  assignedTo: string[];
+  /** True when nothing is scheduled in the room this semester. */
+  noClasses: boolean;
+}
+
+/** A room the user assigned to departments, e.g. one with no classes this semester. */
+export interface AssignedRoom {
+  room: string;
+  departments: string[];
 }
 
 /** Totals for a group of rooms (e.g. rooms only one department uses). */
@@ -235,14 +247,14 @@ function buildFindings(report: Omit<DepartmentReport, 'findings'>): Finding[] {
       text: `Over 100% (classes also run before 08:00 or after 16:00): ${listRooms(over, (r) => `${r.totalUtilization}%`)}.`
     });
   }
-  const low = rooms.filter((r) => r.totalUtilization < 50).reverse();
+  const low = rooms.filter((r) => r.totalUtilization < 50 && !r.noClasses).reverse();
   if (low.length) {
     findings.push({
       tone: 'good',
       text: `Spare capacity (under 50% used): ${listRooms(low, (r) => `${r.totalUtilization}%, ${r.freeHours}h free`)}.`
     });
   }
-  const mostlyOthers = rooms.filter((r) => r.selectedShare < 25);
+  const mostlyOthers = rooms.filter((r) => r.selectedShare < 25 && !r.noClasses);
   if (mostlyOthers.length) {
     findings.push({
       tone: 'info',
@@ -255,6 +267,15 @@ function buildFindings(report: Omit<DepartmentReport, 'findings'>): Finding[] {
     findings.push({
       tone: 'warn',
       text: `${report.clashes.length} time clash(es): two classes booked in the same room at the same time (see the Clashes table).`
+    });
+  }
+  const empty = rooms.filter((r) => r.noClasses);
+  if (empty.length) {
+    findings.push({
+      tone: 'good',
+      text:
+        `No classes this semester (fully free, ${capacityPerRoom}h a week each): ` +
+        `${empty.map((r) => `${r.room} (${r.assignedTo.join(', ')})`).join(', ')}.`
     });
   }
   if (report.virtualMeetings.length) {
@@ -275,6 +296,8 @@ function buildFindings(report: Omit<DepartmentReport, 'findings'>): Finding[] {
 export interface DepartmentReportOptions {
   /** Placeholder rooms for online classes; left out of all room figures. */
   virtualRooms?: string[];
+  /** Rooms assigned to departments by the user; included even with no classes. */
+  assignedRooms?: AssignedRoom[];
 }
 
 export function buildDepartmentReport(
@@ -299,7 +322,18 @@ export function buildDepartmentReport(
   const capacityPerRoom = days.length * FULL_OCCUPANCY_HOURS;
 
   const selectedMeetings = meetings.filter((m) => selected.has(m.department)).sort(compareMeetings);
-  const roomNames = Array.from(new Set(selectedMeetings.map((m) => m.room)));
+  const assignedTo = new Map<string, string[]>();
+  (options.assignedRooms ?? []).forEach((a) => {
+    if (!virtual.has(a.room)) assignedTo.set(a.room, a.departments);
+  });
+  const roomNames = Array.from(
+    new Set([
+      ...selectedMeetings.map((m) => m.room),
+      ...Array.from(assignedTo.entries())
+        .filter(([, depts]) => depts.some((d) => selected.has(d)))
+        .map(([room]) => room)
+    ])
+  );
   const roomSet = new Set(roomNames);
   const otherMeetings = meetings
     .filter((m) => !selected.has(m.department) && roomSet.has(m.room))
@@ -320,6 +354,8 @@ export function buildDepartmentReport(
       const selectedHours = sum(mine, (m) => m.hours);
       const otherHoursTotal = sum(others, (m) => m.hours);
       const totalHours = selectedHours + otherHoursTotal;
+      const assigned = assignedTo.get(room) ?? [];
+      const unique = (list: string[]) => Array.from(new Set(list)).sort((a, b) => a.localeCompare(b));
       return {
         room,
         hoursByDepartment,
@@ -334,8 +370,10 @@ export function buildDepartmentReport(
         selectedShare: pct(selectedHours, totalHours),
         selectedClasses: mine.length,
         otherClasses: others.length,
-        usedBy: Object.keys(hoursByDepartment).sort((a, b) => a.localeCompare(b)),
-        sharedWith: Object.keys(otherHours).sort((a, b) => a.localeCompare(b))
+        usedBy: unique([...Object.keys(hoursByDepartment), ...assigned.filter((d) => selected.has(d))]),
+        sharedWith: unique([...Object.keys(otherHours), ...assigned.filter((d) => !selected.has(d))]),
+        assignedTo: assigned,
+        noClasses: mine.length + others.length === 0
       };
     })
     .sort((a, b) => b.totalUtilization - a.totalUtilization || a.room.localeCompare(b.room));
@@ -375,11 +413,11 @@ export function buildDepartmentReport(
   const byDepartment: DepartmentSummary[] = departments.map((department) => {
     const own = selectedMeetings.filter((m) => m.department === department);
     const online = virtualMeetings.filter((m) => m.department === department);
-    const deptRooms = rooms.filter((r) => r.hoursByDepartment[department]);
+    const deptRooms = rooms.filter((r) => r.hoursByDepartment[department] || r.assignedTo.includes(department));
     const isOwn = (r: RoomUsage) => r.usedBy.length === 1 && r.sharedWith.length === 0;
     const shared = deptRooms.filter((r) => !isOwn(r));
     const sharedTotals = groupTotals(shared, capacityPerRoom);
-    const departmentHours = sum(shared, (r) => r.hoursByDepartment[department]);
+    const departmentHours = sum(shared, (r) => r.hoursByDepartment[department] || 0);
     return {
       department,
       courses: new Set([...own, ...online].map((m) => m.code)).size,

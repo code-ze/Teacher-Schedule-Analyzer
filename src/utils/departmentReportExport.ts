@@ -60,8 +60,9 @@ function hoursText(hours: Record<string, number>): string {
 }
 
 function roomStatus(report: DepartmentReport, r: RoomUsage): string {
-  if (r.sharedWith.length > 0) return 'Shared';
-  return report.departments.length > 1 && r.usedBy.length > 1 ? 'Selected depts only' : `Only ${r.usedBy[0]}`;
+  if (r.sharedWith.length > 0) return r.noClasses ? 'Shared (no classes)' : 'Shared';
+  const status = report.departments.length > 1 && r.usedBy.length > 1 ? 'Selected depts only' : `Only ${r.usedBy[0]}`;
+  return r.noClasses ? `${status} (no classes)` : status;
 }
 
 function keyFigures(report: DepartmentReport): [string, string][] {
