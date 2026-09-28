@@ -2,6 +2,7 @@ import { useState } from 'react';
 import FileUpload from './components/FileUpload';
 import StatsPanel from './components/StatsPanel';
 import TimeQuery from './components/TimeQuery';
+import CourseSearch from './components/CourseSearch';
 import MeetingFinder from './components/MeetingFinder';
 import ClassroomsSection from './components/ClassroomsSection';
 import DepartmentReportSection from './components/DepartmentReportSection';
@@ -95,6 +96,9 @@ export default function App() {
           <>
             <div hidden={tab !== 'overview'}>
               <StatsPanel data={data} onOpenTab={openTab} />
+            </div>
+            <div hidden={tab !== 'classes'}>
+              <CourseSearch courses={data.courses} departments={data.departments} />
             </div>
             <div hidden={tab !== 'availability'}>
               <TimeQuery teachers={data.teachers} />
