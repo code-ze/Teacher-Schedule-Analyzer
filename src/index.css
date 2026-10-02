@@ -954,3 +954,4 @@ select { cursor: pointer; padding-right: 8px; }
 .heat-table th { color: var(--muted); font-weight: 600; padding: 4px 6px; text-align: center; }
 .heat-table tbody th { text-align: right; white-space: nowrap; }
 .heat-table td { text-align: center; padding: 8px 2px; border-radius: 4px; background: var(--surface-2); min-width: 44px; font-variant-numeric: tabular-nums; }
+.row-flag td { background: var(--amber-soft); }

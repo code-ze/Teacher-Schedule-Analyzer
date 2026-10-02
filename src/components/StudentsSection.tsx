@@ -163,6 +163,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
   const [selected, setSelected] = useState<string | null>(null);
   const [sizeDept, setSizeDept] = useState('ALL');
   const [heatDept, setHeatDept] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusDept, setStatusDept] = useState('ALL');
+  const [statusQuery, setStatusQuery] = useState('');
 
   const index = useMemo(() => (students ? buildStudentIndex(students, courses) : null), [students, courses]);
 
@@ -231,6 +234,50 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
   const heat = heatDept === 'ALL' ? index.heat : index.heatByDept[heatDept] ?? index.heat;
   const heatMax = Math.max(1, ...WORK_DAYS.flatMap((d) => HEAT_HOURS.map((h) => heat[d]?.[h] ?? 0)));
   const heatDays = WORK_DAYS.filter((d) => HEAT_HOURS.some((h) => (index.heat[d]?.[h] ?? 0) > 0));
+
+  // Students who are not simply "Studying with courses": OJT, suspended, postponed, ...
+  // (from the "No Courses" sheet) plus registered students whose status isn't "Studying".
+  const statusRows = [
+    ...students.noCourses.map((n) => ({
+      id: n.id,
+      name: index.profiles.get(n.id)?.name ?? '',
+      department: n.department,
+      level: n.level,
+      status: n.status || '—',
+      courses: index.profiles.get(n.id)?.enrolments.length ?? 0,
+      note: n.status === 'Studying' ? 'Studying but no courses' : 'No courses this semester'
+    })),
+    ...profiles
+      .filter((p) => p.status !== 'Studying' && !students.noCourses.some((n) => n.id === p.id))
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        department: p.department,
+        level: p.level,
+        status: p.status || '—',
+        courses: p.enrolments.length,
+        note: 'Registered in courses but not "Studying"'
+      }))
+  ].sort((a, b) => a.status.localeCompare(b.status) || a.department.localeCompare(b.department) || a.id.localeCompare(b.id));
+  const statusNames = Array.from(new Set(statusRows.map((r) => r.status))).sort();
+  const statusDepts = Array.from(new Set(statusRows.map((r) => r.department))).sort();
+  const sq = statusQuery.trim().toLowerCase();
+  const statusShown = statusRows.filter(
+    (r) =>
+      (statusFilter === 'ALL' || r.status === statusFilter) &&
+      (statusDept === 'ALL' || r.department === statusDept) &&
+      (!sq || r.id.toLowerCase().includes(sq) || r.name.toLowerCase().includes(sq))
+  );
+  const exportStatus = () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Student ID', 'Name', 'Department', 'Level', 'Status', 'Registered courses', 'Note'],
+      ...statusShown.map((r) => [r.id, r.name || '(not in file)', r.department, r.level, r.status, r.courses, r.note])
+    ]);
+    ws['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 26 }, { wch: 18 }, { wch: 22 }, { wch: 18 }, { wch: 38 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Student status');
+    XLSX.writeFile(wb, `student-status-${today()}.xlsx`);
+  };
 
   const exportSizes = () => {
     const wb = XLSX.utils.book_new();
@@ -338,6 +385,123 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
       </section>
 
       <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Student status: OJT, suspended, postponed…</h2>
+            <p className="panel-sub">
+              Students with no courses this semester and registered students whose status isn't “Studying”. The “No
+              Courses” sheet has no names, so those students show their ID only.
+            </p>
+          </div>
+          <div className="panel-actions">
+            <button className="export-excel-btn" onClick={exportStatus} disabled={statusShown.length === 0}>
+              📊 Excel
+            </button>
+          </div>
+        </div>
+
+        <div className="table-scroll" style={{ marginBottom: 14 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                {statusDepts.map((d) => (
+                  <th key={d}>{d}</th>
+                ))}
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {statusNames.map((st) => (
+                <tr key={st}>
+                  <td className="strong">
+                    <button className="btn-link" onClick={() => setStatusFilter(st)}>
+                      {st}
+                    </button>
+                  </td>
+                  {statusDepts.map((d) => (
+                    <td key={d}>{statusRows.filter((r) => r.status === st && r.department === d).length || '–'}</td>
+                  ))}
+                  <td className="strong">{statusRows.filter((r) => r.status === st).length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="toolbar">
+          <input
+            type="search"
+            className="grow"
+            aria-label="Search status list"
+            placeholder="🔍 Student ID or name…"
+            value={statusQuery}
+            onChange={(e) => setStatusQuery(e.target.value)}
+          />
+          <select aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="ALL">All statuses</option>
+            {statusNames.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+          <select aria-label="Status department" value={statusDept} onChange={(e) => setStatusDept(e.target.value)}>
+            <option value="ALL">All departments</option>
+            {statusDepts.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <span className="muted">{statusShown.length} students</span>
+        </div>
+        <div className="table-scroll" style={{ maxHeight: 460, overflowY: 'auto' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Department</th>
+                <th>Level</th>
+                <th>Status</th>
+                <th>Courses</th>
+                <th>Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              {statusShown.map((r) => (
+                <tr key={r.id} className={r.courses ? 'row-flag' : undefined}>
+                  <td className="strong">
+                    {r.courses ? (
+                      <button
+                        className="btn-link"
+                        onClick={() => {
+                          setQuery(r.id);
+                          setSelected(r.id);
+                          document.getElementById('find-student')?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                      >
+                        {r.id}
+                      </button>
+                    ) : (
+                      r.id
+                    )}
+                  </td>
+                  <td>{r.name || <span className="muted">not in file</span>}</td>
+                  <td>{r.department}</td>
+                  <td>{r.level}</td>
+                  <td>{r.status}</td>
+                  <td>{r.courses || '–'}</td>
+                  <td>{r.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel" id="find-student">
         <div className="panel-header">
           <div>
             <h2>Find a student</h2>
