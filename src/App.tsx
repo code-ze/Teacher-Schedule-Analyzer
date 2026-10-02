@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import FileUpload from './components/FileUpload';
 import StatsPanel from './components/StatsPanel';
 import TimeQuery from './components/TimeQuery';
@@ -8,6 +8,8 @@ import ClassroomsSection from './components/ClassroomsSection';
 import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
 import SpaceReportSection from './components/SpaceReportSection';
+import StudentsSection from './components/StudentsSection';
+import { buildStudentIndex } from './utils/students/students';
 import VirtualRoomsPanel from './components/VirtualRoomsPanel';
 import { loadVirtualRooms, saveVirtualRooms } from './utils/virtualRooms';
 import AssignedRoomsPanel from './components/AssignedRoomsPanel';
@@ -17,7 +19,7 @@ import { useScheduleData } from './hooks/useScheduleData';
 import { TABS, type TabId } from './tabs';
 
 export default function App() {
-  const { data, loading, error, fileNames, loadFiles } = useScheduleData();
+  const { data, loading, error, fileNames, students, studentFileName, loadFiles, clearStudents } = useScheduleData();
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('overview');
   const [virtualRooms, setVirtualRooms] = useState<string[]>(loadVirtualRooms);
@@ -37,6 +39,11 @@ export default function App() {
         : [...virtualRooms, room].sort((a, b) => a.localeCompare(b))
     );
   const hasData = !loading && !!data && data.totalClasses > 0;
+  // Students per section, for showing class sizes elsewhere (e.g. Find a Class).
+  const sectionSizes = useMemo(
+    () => (students && data ? buildStudentIndex(students, data.courses).sectionSizes : undefined),
+    [students, data]
+  );
 
   const openTab = (id: TabId) => {
     setTab(id);
@@ -99,6 +106,12 @@ export default function App() {
           </div>
         )}
 
+        {!loading && !hasData && students && (
+          <div className="empty-state" style={{ marginTop: 16 }}>
+            🎓 Student data loaded ({students.students.length.toLocaleString()} students from {studentFileName}). Now drop
+            the timetable to see it in the Students tab.
+          </div>
+        )}
         {!loading && !hasData && <FileUpload onFiles={(files) => loadFiles(files)} />}
 
         {hasData && data && (
@@ -107,7 +120,7 @@ export default function App() {
               <StatsPanel data={data} onOpenTab={openTab} />
             </div>
             <div hidden={tab !== 'classes'}>
-              <CourseSearch courses={data.courses} departments={data.departments} />
+              <CourseSearch courses={data.courses} departments={data.departments} sectionSizes={sectionSizes} />
             </div>
             <div hidden={tab !== 'availability'}>
               <TimeQuery teachers={data.teachers} />
@@ -146,6 +159,15 @@ export default function App() {
             </div>
             <div hidden={tab !== 'space'}>
               <SpaceReportSection courses={data.courses} departments={data.departments} timetableName={fileNames.join(', ')} />
+            </div>
+            <div hidden={tab !== 'students'}>
+              <StudentsSection
+                students={students}
+                fileName={studentFileName}
+                courses={data.courses}
+                onFiles={(files) => loadFiles(files)}
+                onClear={clearStudents}
+              />
             </div>
             <div hidden={tab !== 'instructors'}>
               <TeacherSchedules teachers={data.teachers} />

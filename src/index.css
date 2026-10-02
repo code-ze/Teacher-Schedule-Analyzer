@@ -930,3 +930,27 @@ select { cursor: pointer; padding-right: 8px; }
 .space-optional[open] > summary::before { transform: rotate(90deg); }
 .space-optional[open] > summary { margin-bottom: 10px; }
 .space-optional > summary .filter-label { display: inline; margin: 0; }
+
+/* Students */
+.student-facts { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-warn { background: var(--red-soft); color: var(--red); }
+.student-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.student-result {
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.student-result:hover { border-color: var(--accent); background: var(--accent-soft); }
+.clash-slot { background: var(--red-soft); color: var(--red); }
+.clash-slot span, .busy-slot span { display: block; font-size: 11px; }
+.size-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; }
+.heat-table { border-collapse: separate; border-spacing: 2px; width: 100%; font-size: 12px; }
+.heat-table th { color: var(--muted); font-weight: 600; padding: 4px 6px; text-align: center; }
+.heat-table tbody th { text-align: right; white-space: nowrap; }
+.heat-table td { text-align: center; padding: 8px 2px; border-radius: 4px; background: var(--surface-2); min-width: 44px; font-variant-numeric: tabular-nums; }
