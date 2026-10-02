@@ -7,11 +7,13 @@ const PAGE_SIZE = 25;
 interface Props {
   courses: Record<string, CourseSection>;
   departments: string[];
+  /** Students registered per section ("CODE-section"), when student data is loaded. */
+  sectionSizes?: Map<string, number>;
 }
 
 // Find where and when a class meets: search by course code, course name,
 // instructor or room and list every matching section with its meetings.
-export default function CourseSearch({ courses, departments }: Props) {
+export default function CourseSearch({ courses, departments, sectionSizes }: Props) {
   const [query, setQuery] = useState('');
   const [dept, setDept] = useState('ALL');
   const [day, setDay] = useState('ALL');
@@ -113,6 +115,7 @@ export default function CourseSearch({ courses, departments }: Props) {
                   <div className="muted">
                     Section {s.section}
                     {s.department ? ` · ${s.department}` : ''}
+                    {sectionSizes ? ` · ${sectionSizes.get(s.key) ?? 0} students` : ''}
                   </div>
                 </div>
                 <div className="table-scroll">

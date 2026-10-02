@@ -1,0 +1,574 @@
+import { useMemo, useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
+import { WORK_DAYS } from '../config';
+import type { CourseSection } from '../types';
+import { toMinutes } from '../utils/departmentReport';
+import { buildStudentIndex, HEAT_HOURS, type StudentData, type StudentProfile } from '../utils/students/students';
+
+interface Props {
+  students: StudentData | null;
+  fileName: string;
+  courses: Record<string, CourseSection>;
+  onFiles: (files: FileList) => void;
+  onClear: () => void;
+}
+
+const median = (xs: number[]) => {
+  if (xs.length === 0) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+};
+const fmt = (n: number) => n.toLocaleString();
+const today = () => new Date().toISOString().split('T')[0];
+
+function countBy<T>(items: T[], key: (t: T) => string) {
+  const m = new Map<string, T[]>();
+  items.forEach((t) => {
+    const k = key(t) || '—';
+    const list = m.get(k);
+    if (list) list.push(t);
+    else m.set(k, [t]);
+  });
+  return Array.from(m.entries()).sort((a, b) => b[1].length - a[1].length);
+}
+
+function sectionRow(c: CourseSection) {
+  const ms = WORK_DAYS.flatMap((d) => c.schedule[d] ?? []);
+  return {
+    days: ms.map((m) => `${m.day.slice(0, 3)} ${m.startTime}-${m.endTime}`).join(', '),
+    rooms: Array.from(new Set(ms.map((m) => m.room))).join(', '),
+    teacher: c.teacher
+  };
+}
+
+function StudentProfileView({ p }: { p: StudentProfile }) {
+  const days = WORK_DAYS.filter((d) => p.meetings.some((m) => m.day === d));
+  const hh = (h: number) => `${String(h).padStart(2, '0')}:00`;
+  const hours = Array.from(
+    new Set(
+      p.meetings.flatMap((m) => {
+        const out: string[] = [];
+        for (let h = Math.floor(toMinutes(m.startTime) / 60); h * 60 < toMinutes(m.endTime); h++) out.push(hh(h));
+        return out;
+      })
+    )
+  ).sort();
+  const sections = Array.from(new Set(p.meetings.map((m) => m.sectionKey)));
+  return (
+    <div className="subpanel">
+      <div className="subpanel-header">
+        <div>
+          <strong>{p.name || p.id}</strong> <span className="muted">· {p.id}</span>
+          <div className="muted">
+            {p.department} · {p.level} · {p.status}
+          </div>
+        </div>
+        <div className="student-facts">
+          <span className="tag">{p.enrolments.length} courses</span>
+          <span className="tag">{p.creditHours} credit hours</span>
+          <span className="tag">{p.weeklyHours}h a week</span>
+          <span className="tag">{p.daysOnCampus} days on campus</span>
+          {p.clashes.length > 0 && <span className="tag tag-warn">{p.clashes.length} clash{p.clashes.length > 1 ? 'es' : ''}</span>}
+        </div>
+      </div>
+
+      <div className="table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Course</th>
+              <th>Course name</th>
+              <th>Sec</th>
+              <th>Credits</th>
+              <th>Days &amp; times</th>
+              <th>Room</th>
+              <th>Instructor</th>
+            </tr>
+          </thead>
+          <tbody>
+            {p.enrolments.map((e) => {
+              const ms = p.meetings.filter((m) => m.sectionKey === `${e.courseNo}-${e.section}`);
+              return (
+                <tr key={`${e.courseNo}-${e.section}`}>
+                  <td className="strong">{e.courseNo}</td>
+                  <td>{e.courseName}</td>
+                  <td>{e.section}</td>
+                  <td>{e.creditHours}</td>
+                  <td>
+                    {ms.length
+                      ? ms.map((m) => `${m.day.slice(0, 3)} ${m.startTime}-${m.endTime}`).join(', ')
+                      : e.inClassList.startsWith('No – test')
+                        ? 'Test, no class'
+                        : 'Not in the timetable'}
+                  </td>
+                  <td>{Array.from(new Set(ms.map((m) => m.room))).join(', ') || '–'}</td>
+                  <td>{Array.from(new Set(ms.map((m) => m.teacher))).join(', ') || '–'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {days.length > 0 && (
+        <div className="week-grid-scroll" style={{ marginTop: 12 }}>
+          <table className="week-grid">
+            <thead>
+              <tr>
+                <th />
+                {days.map((d) => (
+                  <th key={d}>{d.slice(0, 3)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {hours.map((h) => (
+                <tr key={h}>
+                  <th>{h}</th>
+                  {days.map((d) => {
+                    const start = toMinutes(h);
+                    const here = p.meetings.filter(
+                      (m) => m.day === d && toMinutes(m.startTime) < start + 60 && toMinutes(m.endTime) > start
+                    );
+                    if (here.length === 0) return <td key={d} className="free-slot" />;
+                    return (
+                      <td key={d} className={here.length > 1 ? 'clash-slot' : 'busy-slot'} title={here.map((m) => m.courseName).join(' / ')}>
+                        {here.map((m) => (
+                          <span key={m.sectionKey}>
+                            <strong>{m.code}</strong> {m.room}
+                          </span>
+                        ))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {sections.length > 0 && p.clashes.length > 0 && (
+            <p className="department-report-note" style={{ marginTop: 6 }}>
+              Red cells: two classes at the same time.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function StudentsSection({ students, fileName, courses, onFiles, onClear }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState<string | null>(null);
+  const [sizeDept, setSizeDept] = useState('ALL');
+  const [heatDept, setHeatDept] = useState('ALL');
+
+  const index = useMemo(() => (students ? buildStudentIndex(students, courses) : null), [students, courses]);
+
+  if (!students || !index) {
+    return (
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Students</h2>
+            <p className="panel-sub">
+              Load the student registration Excel (the “Student Courses” export: one row per student per course) to see
+              each student's timetable, clashes, class sizes and when students are on campus.
+            </p>
+          </div>
+        </div>
+        <div
+          className={`mini-drop${dragOver ? ' dragover' : ''}`}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            if (e.dataTransfer.files.length) onFiles(e.dataTransfer.files);
+          }}
+        >
+          📥 Drop the student Excel here, or click to choose it
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="file-input"
+            onChange={(e) => {
+              if (e.target.files?.length) onFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </div>
+        <p className="upload-privacy" style={{ textAlign: 'left' }}>
+          Student data stays in this browser: it is not uploaded or saved anywhere.
+        </p>
+      </section>
+    );
+  }
+
+  const profiles = Array.from(index.profiles.values());
+  const enrolled = profiles.filter((p) => p.enrolments.length > 0);
+  const clashStudents = new Set(index.clashes.map((c) => c.studentId));
+  const departments = countBy(profiles, (p) => p.department);
+
+  const q = query.trim().toLowerCase();
+  const matches = q.length >= 2 ? profiles.filter((p) => p.id.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)).slice(0, 25) : [];
+  const chosen = selected ? index.profiles.get(selected) ?? null : null;
+
+  const sizeRows = Object.values(courses)
+    .filter((c) => sizeDept === 'ALL' || c.department === sizeDept)
+    .map((c) => ({ c, size: index.sectionSizes.get(c.key) ?? 0 }));
+  const largest = [...sizeRows].sort((a, b) => b.size - a.size).slice(0, 15);
+  const small = sizeRows.filter((r) => r.size > 0 && r.size <= 5).sort((a, b) => a.size - b.size);
+  const empty = sizeRows.filter((r) => r.size === 0);
+  const timetableDepts = Array.from(new Set(Object.values(courses).map((c) => c.department).filter(Boolean) as string[])).sort();
+
+  const heat = heatDept === 'ALL' ? index.heat : index.heatByDept[heatDept] ?? index.heat;
+  const heatMax = Math.max(1, ...WORK_DAYS.flatMap((d) => HEAT_HOURS.map((h) => heat[d]?.[h] ?? 0)));
+  const heatDays = WORK_DAYS.filter((d) => HEAT_HOURS.some((h) => (index.heat[d]?.[h] ?? 0) > 0));
+
+  const exportSizes = () => {
+    const wb = XLSX.utils.book_new();
+    const rows = Object.values(courses)
+      .map((c) => ({ c, size: index.sectionSizes.get(c.key) ?? 0, ...sectionRow(c) }))
+      .sort((a, b) => (a.c.department || '').localeCompare(b.c.department || '') || a.c.key.localeCompare(b.c.key));
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Department', 'Course', 'Course name', 'Section', 'Students', 'Days & times', 'Rooms', 'Instructor'],
+      ...rows.map((r) => [r.c.department || '', r.c.code, r.c.name, r.c.section, r.size, r.days, r.rooms, r.teacher])
+    ]);
+    ws['!cols'] = [{ wch: 26 }, { wch: 11 }, { wch: 44 }, { wch: 8 }, { wch: 9 }, { wch: 40 }, { wch: 16 }, { wch: 30 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Class sizes');
+    const clashes = XLSX.utils.aoa_to_sheet([
+      ['Student ID', 'Department', 'Day', 'Class 1', 'Time 1', 'Room 1', 'Class 2', 'Time 2', 'Room 2'],
+      ...index.clashes.map((c) => [
+        c.studentId,
+        index.profiles.get(c.studentId)?.department ?? '',
+        c.day,
+        c.first.sectionKey,
+        `${c.first.startTime}-${c.first.endTime}`,
+        c.first.room,
+        c.second.sectionKey,
+        `${c.second.startTime}-${c.second.endTime}`,
+        c.second.room
+      ])
+    ]);
+    XLSX.utils.book_append_sheet(wb, clashes, 'Student clashes');
+    XLSX.writeFile(wb, `class-sizes-and-clashes-${today()}.xlsx`);
+  };
+
+  return (
+    <>
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Students</h2>
+            <p className="panel-sub">
+              From <strong>{fileName}</strong>, joined with the timetable by course and section. Student data stays in
+              this browser.
+            </p>
+          </div>
+          <div className="panel-actions">
+            <button className="export-excel-btn" onClick={exportSizes}>
+              📊 Class sizes &amp; clashes (Excel)
+            </button>
+            <button className="btn-link" onClick={onClear}>
+              Remove student data
+            </button>
+          </div>
+        </div>
+
+        <div className="stats">
+          {[
+            ['Students', fmt(profiles.length)],
+            ['Course registrations', fmt(students.enrolments.length)],
+            ['Typical hours a week', `${median(enrolled.map((p) => p.weeklyHours))}h`],
+            ['On campus 5 days', `${Math.round((enrolled.filter((p) => p.daysOnCampus === 5).length / Math.max(1, enrolled.length)) * 100)}%`],
+            ['Students with a clash', fmt(clashStudents.size)],
+            ['Active, no courses', fmt(students.noCourses.length)]
+          ].map(([label, value]) => (
+            <div className="stat-item" key={label}>
+              <div className="stat-number">{value}</div>
+              <div className="stat-label">{label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Students</th>
+                <th>Typical courses</th>
+                <th>Typical hours / week</th>
+                <th>On campus 5 days</th>
+                <th>With a clash</th>
+              </tr>
+            </thead>
+            <tbody>
+              {departments.map(([dept, list]) => (
+                <tr key={dept}>
+                  <td className="strong">{dept}</td>
+                  <td>{fmt(list.length)}</td>
+                  <td>{median(list.map((p) => p.enrolments.length))}</td>
+                  <td>{median(list.map((p) => p.weeklyHours))}h</td>
+                  <td>{Math.round((list.filter((p) => p.daysOnCampus === 5).length / list.length) * 100)}%</td>
+                  <td>{list.filter((p) => clashStudents.has(p.id)).length || '–'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="department-report-note" style={{ marginTop: 8 }}>
+          By level:{' '}
+          {countBy(profiles, (p) => p.level)
+            .map(([k, v]) => `${k} ${fmt(v.length)}`)
+            .join(' · ')}
+          . By status:{' '}
+          {countBy(profiles, (p) => p.status)
+            .map(([k, v]) => `${k} ${fmt(v.length)}`)
+            .join(' · ')}
+          .
+        </p>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Find a student</h2>
+            <p className="panel-sub">Search by student ID or name to see their courses, rooms, instructors and week.</p>
+          </div>
+        </div>
+        <div className="toolbar">
+          <input
+            type="search"
+            className="grow"
+            aria-label="Search students"
+            placeholder="🔍 Student ID or name…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelected(null);
+            }}
+          />
+          {q.length >= 2 && <span className="muted">{matches.length === 25 ? '25+ matches' : `${matches.length} found`}</span>}
+        </div>
+        {!chosen && matches.length > 0 && (
+          <div className="student-results">
+            {matches.map((p) => (
+              <button key={p.id} className="student-result" onClick={() => setSelected(p.id)}>
+                <strong>{p.name || p.id}</strong>
+                <span className="muted">
+                  {p.id} · {p.department} · {p.enrolments.length} courses
+                  {p.clashes.length ? ' · ⚠ clash' : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {chosen && (
+          <>
+            <button className="btn-link" onClick={() => setSelected(null)}>
+              ← Back to results
+            </button>
+            <StudentProfileView p={chosen} />
+          </>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Student clashes</h2>
+            <p className="panel-sub">Students registered in two classes that meet at the same time.</p>
+          </div>
+        </div>
+        {index.clashes.length === 0 ? (
+          <div className="empty-state">No student has two classes at the same time. 🎉</div>
+        ) : (
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Department</th>
+                  <th>Day</th>
+                  <th>Class 1</th>
+                  <th>Class 2</th>
+                </tr>
+              </thead>
+              <tbody>
+                {index.clashes.map((c, i) => {
+                  const p = index.profiles.get(c.studentId);
+                  return (
+                    <tr key={i}>
+                      <td>
+                        <button className="btn-link" onClick={() => { setQuery(c.studentId); setSelected(c.studentId); }}>
+                          {c.studentId}
+                        </button>
+                      </td>
+                      <td>{p?.department}</td>
+                      <td>{c.day}</td>
+                      <td>
+                        <strong>{c.first.sectionKey}</strong> {c.first.startTime}-{c.first.endTime} · {c.first.room}
+                      </td>
+                      <td>
+                        <strong>{c.second.sectionKey}</strong> {c.second.startTime}-{c.second.endTime} · {c.second.room}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Class sizes</h2>
+            <p className="panel-sub">Students registered in each timetable section.</p>
+          </div>
+          <div className="panel-actions">
+            <select aria-label="Department" value={sizeDept} onChange={(e) => setSizeDept(e.target.value)}>
+              <option value="ALL">All departments</option>
+              {timetableDepts.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="size-grid">
+          <div>
+            <h3 className="overview-heading">Largest sections</h3>
+            <div className="table-scroll">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Section</th>
+                    <th>Students</th>
+                    <th>Days &amp; times</th>
+                    <th>Room</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {largest.map(({ c, size }) => (
+                    <tr key={c.key}>
+                      <td className="strong" title={c.name}>
+                        {c.key}
+                      </td>
+                      <td>{size}</td>
+                      <td>{sectionRow(c).days}</td>
+                      <td>{sectionRow(c).rooms}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div>
+            <h3 className="overview-heading">
+              Small (5 or fewer) and empty sections <span className="count-pill">{small.length + empty.length}</span>
+            </h3>
+            <div className="table-scroll" style={{ maxHeight: 420, overflowY: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Section</th>
+                    <th>Students</th>
+                    <th>Instructor</th>
+                    <th>Room</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...empty, ...small].map(({ c, size }) => (
+                    <tr key={c.key}>
+                      <td className="strong" title={c.name}>
+                        {c.key}
+                      </td>
+                      <td>{size || 'none'}</td>
+                      <td>{c.teacher}</td>
+                      <td>{sectionRow(c).rooms}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        {index.unmatched.length > 0 && (
+          <p className="department-report-note" style={{ marginTop: 10 }}>
+            {fmt(index.unmatched.reduce((s, u) => s + u.count, 0))} registrations are for courses or sections not in the
+            timetable (mostly 0-credit tests with no class):{' '}
+            {index.unmatched
+              .slice(0, 8)
+              .map((u) => `${u.courseNo} (${u.count})`)
+              .join(', ')}
+            {index.unmatched.length > 8 ? '…' : ''}.
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>When students are on campus</h2>
+            <p className="panel-sub">Students in class at each hour (a student with two classes in the same hour is counted once).</p>
+          </div>
+          <div className="panel-actions">
+            <select aria-label="Department" value={heatDept} onChange={(e) => setHeatDept(e.target.value)}>
+              <option value="ALL">All departments</option>
+              {Object.keys(index.heatByDept)
+                .sort()
+                .map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+        <div className="table-scroll">
+          <table className="heat-table">
+            <thead>
+              <tr>
+                <th />
+                {HEAT_HOURS.map((h) => (
+                  <th key={h}>{h.slice(0, 2)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {heatDays.map((d) => (
+                <tr key={d}>
+                  <th>{d}</th>
+                  {HEAT_HOURS.map((h) => {
+                    const v = heat[d]?.[h] ?? 0;
+                    const a = v / heatMax;
+                    return (
+                      <td
+                        key={h}
+                        title={`${d} ${h}: ${fmt(v)} students`}
+                        style={{ background: v ? `rgba(79, 70, 229, ${0.08 + a * 0.85})` : undefined, color: a > 0.55 ? '#fff' : undefined }}
+                      >
+                        {v ? fmt(v) : ''}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
