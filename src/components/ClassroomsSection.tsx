@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { WORK_DAYS, DISPLAY_HOURS, extractClassId } from '../config';
 import type { Classroom } from '../types';
 import { computeDepartmentUtilization } from '../utils/departmentUtilization';
@@ -166,13 +166,32 @@ interface Props {
   onToggleVirtual?: (room: string) => void;
   /** Rooms assigned to departments by the user; empty ones are shown with 0%. */
   assignedRooms?: AssignedRoom[];
+  /** Which panels to show: department utilization, the room list, or both (default). */
+  part?: 'all' | 'departments' | 'rooms';
+  /** Room search from a shared search box; hides this panel's own room box. */
+  query?: string;
+  /** Extra content shown at the top of the room list (e.g. room settings). */
+  roomsHeader?: ReactNode;
+}
+
+/** Rooms whose name contains any of the comma-separated search terms. */
+export function searchRooms(names: string[], query: string): string[] {
+  const terms = query
+    .toLowerCase()
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  return terms.length ? names.filter((n) => terms.some((t) => n.toLowerCase().includes(t))) : names;
 }
 
 export default function ClassroomsSection({
   classrooms: scheduledClassrooms,
   virtualRooms = [],
   onToggleVirtual,
-  assignedRooms = []
+  assignedRooms = [],
+  part = 'all',
+  query,
+  roomsHeader
 }: Props) {
   const virtualSet = useMemo(() => new Set(virtualRooms), [virtualRooms]);
   // Add assigned rooms that have no classes in this file as empty rooms.
@@ -199,7 +218,8 @@ export default function ClassroomsSection({
   const exportedStats = selectedDepts.length
     ? departmentStats.filter((d) => selectedDepts.includes(d.name))
     : departmentStats;
-  const [roomSearch, setRoomSearch] = useState('');
+  const [ownRoomSearch, setRoomSearch] = useState('');
+  const roomSearch = query ?? ownRoomSearch;
   const [buildingSearch, setBuildingSearch] = useState('');
 
   const filteredClassrooms = useMemo(() => {
@@ -207,14 +227,8 @@ export default function ClassroomsSection({
     if (selectedDepts.length > 0) {
       list = list.filter((c) => selectedDepts.some((d) => c.departments.has(d)));
     }
-    const terms = roomSearch
-      .toLowerCase()
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-    if (terms.length > 0) {
-      list = list.filter((c) => terms.some((t) => c.name.toLowerCase().includes(t)));
-    }
+    const names = new Set(searchRooms(list.map((c) => c.name), roomSearch));
+    list = list.filter((c) => names.has(c.name));
     // Virtual rooms go last: their percentage isn't a real occupancy.
     return [...list].sort(
       (a, b) =>
@@ -260,6 +274,7 @@ export default function ClassroomsSection({
 
   return (
     <>
+      {part !== 'rooms' && (
       <section className="panel department-utilization-section">
         <div className="panel-header">
           <div>
@@ -321,8 +336,11 @@ export default function ClassroomsSection({
           </div>
         )}
       </section>
+      )}
 
+      {part !== 'departments' && (
       <section className="panel classroom-occupancy-section" id="classroomSection">
+        {roomsHeader}
         <div className="panel-header">
           <div>
             <h2>Rooms</h2>
@@ -365,6 +383,7 @@ export default function ClassroomsSection({
         </div>
 
         <div className="toolbar">
+          {query === undefined && (
           <input
             id="classroomSearch"
             type="search"
@@ -377,6 +396,7 @@ export default function ClassroomsSection({
               setLimit(ROOM_PAGE_SIZE);
             }}
           />
+          )}
           <input
             id="buildingSearch"
             type="search"
@@ -465,6 +485,7 @@ export default function ClassroomsSection({
           </div>
         )}
       </section>
+      )}
     </>
   );
 }

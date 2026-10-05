@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import SubNav from './SubNav';
 import * as XLSX from 'xlsx';
 import { WORK_DAYS } from '../config';
 import type { CourseSection } from '../types';
@@ -11,7 +12,11 @@ interface Props {
   courses: Record<string, CourseSection>;
   onFiles: (files: FileList) => void;
   onClear: () => void;
+  /** Open this student's timetable (e.g. picked in Search). */
+  focus?: { id: string; at: number } | null;
 }
+
+type View = 'overview' | 'status' | 'find' | 'clashes' | 'sizes' | 'campus';
 
 const median = (xs: number[]) => {
   if (xs.length === 0) return 0;
@@ -156,7 +161,8 @@ function StudentProfileView({ p }: { p: StudentProfile }) {
   );
 }
 
-export default function StudentsSection({ students, fileName, courses, onFiles, onClear }: Props) {
+export default function StudentsSection({ students, fileName, courses, onFiles, onClear, focus }: Props) {
+  const [view, setView] = useState<View>('overview');
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [query, setQuery] = useState('');
@@ -168,6 +174,12 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
   const [statusQuery, setStatusQuery] = useState('');
 
   const index = useMemo(() => (students ? buildStudentIndex(students, courses) : null), [students, courses]);
+  useEffect(() => {
+    if (!focus) return;
+    setView('find');
+    setQuery(focus.id);
+    setSelected(focus.id);
+  }, [focus]);
 
   if (!students || !index) {
     return (
@@ -310,6 +322,20 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
 
   return (
     <>
+      <SubNav
+        label="Student views"
+        value={view}
+        onChange={setView}
+        items={[
+          { id: 'overview', label: 'Overview', icon: '📊' },
+          { id: 'status', label: 'Status (OJT, suspended…)', icon: '🏷️', count: statusRows.length },
+          { id: 'find', label: 'Find a student', icon: '🔎' },
+          { id: 'clashes', label: 'Clashes', icon: '⚠️', count: index.clashes.length },
+          { id: 'sizes', label: 'Class sizes', icon: '👥' },
+          { id: 'campus', label: 'On campus', icon: '🗓️' }
+        ]}
+      />
+      {view === 'overview' && (
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -383,7 +409,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           .
         </p>
       </section>
+      )}
 
+      {view === 'status' && (
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -479,7 +507,7 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
                         onClick={() => {
                           setQuery(r.id);
                           setSelected(r.id);
-                          document.getElementById('find-student')?.scrollIntoView({ behavior: 'smooth' });
+                          setView('find');
                         }}
                       >
                         {r.id}
@@ -500,7 +528,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           </table>
         </div>
       </section>
+      )}
 
+      {view === 'find' && (
       <section className="panel" id="find-student">
         <div className="panel-header">
           <div>
@@ -544,7 +574,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           </>
         )}
       </section>
+      )}
 
+      {view === 'clashes' && (
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -592,7 +624,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           </div>
         )}
       </section>
+      )}
 
+      {view === 'sizes' && (
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -680,7 +714,9 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           </p>
         )}
       </section>
+      )}
 
+      {view === 'campus' && (
       <section className="panel">
         <div className="panel-header">
           <div>
@@ -733,6 +769,7 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
           </table>
         </div>
       </section>
+      )}
     </>
   );
 }

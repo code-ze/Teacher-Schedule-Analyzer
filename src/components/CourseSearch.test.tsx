@@ -16,7 +16,7 @@ function search(text: string) {
 describe('CourseSearch', () => {
   it('finds every section of a course with its day, time, room and instructor', () => {
     render(<CourseSearch courses={data.courses} departments={data.departments} />);
-    expect(screen.getByText('Start typing to find a class.')).toBeTruthy();
+    expect(screen.getByText('Type a course code, course name, instructor or room to find a class.')).toBeTruthy();
 
     search('cidn1101');
     expect(screen.getByText('2 sections found')).toBeTruthy();

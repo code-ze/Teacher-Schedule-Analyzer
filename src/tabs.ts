@@ -1,15 +1,14 @@
 // Top-level sections of the app, shown as tabs once a timetable is loaded.
-export type TabId = 'overview' | 'classes' | 'availability' | 'meeting' | 'rooms' | 'report' | 'space' | 'campus' | 'students' | 'instructors';
+export type TabId = 'home' | 'search' | 'availability' | 'departments' | 'campus' | 'students';
 
 export const TABS: { id: TabId; icon: string; label: string; description: string }[] = [
-  { id: 'overview', icon: '📊', label: 'Overview', description: 'Key numbers for the loaded timetable' },
-  { id: 'classes', icon: '🔎', label: 'Find a Class', description: 'Where and when a class meets, its room and instructor' },
-  { id: 'availability', icon: '🕒', label: 'Availability', description: 'Who has class at a time, and who is free in a time range' },
-  { id: 'meeting', icon: '🗓️', label: 'Meeting Finder', description: 'Pick instructors and find a time they are all free' },
-  { id: 'rooms', icon: '🏫', label: 'Rooms', description: 'Room occupancy by department, room and building' },
-  { id: 'report', icon: '📑', label: 'Department Report', description: 'Room utilization report for one or more departments (PDF / Excel)' },
-  { id: 'space', icon: '🏢', label: 'Space Report', description: 'Labs, classrooms, room needs and offices for Business, Design and Mass Comm (PDF)' },
-  { id: 'campus', icon: '🧭', label: 'Campus Plan', description: 'Consolidation figures for chosen departments: classrooms, labs, rooms, students and staff' },
-  { id: 'students', icon: '🎓', label: 'Students', description: 'Student timetables, clashes, class sizes and when students are on campus' },
-  { id: 'instructors', icon: '👩‍🏫', label: 'Instructors', description: 'Weekly schedule of every instructor' }
+  { id: 'home', icon: '🏠', label: 'Home', description: 'Key numbers and shortcuts' },
+  { id: 'search', icon: '🔎', label: 'Search', description: 'Find a class, room, instructor or student and see their week' },
+  { id: 'availability', icon: '🕒', label: 'Availability', description: 'Who is free at a time, and a meeting time for chosen instructors' },
+  { id: 'departments', icon: '🏛️', label: 'Departments', description: 'Room use per department, room reports and the space report (PDF / Excel)' },
+  { id: 'campus', icon: '🧭', label: 'Campus Plan', description: 'Consolidation figures: classrooms and labs needed, rooms, students and staff' },
+  { id: 'students', icon: '🎓', label: 'Students', description: 'Student status, timetables, clashes, class sizes and time on campus' }
 ];
+
+/** Sub-views inside a section. */
+export type SearchScope = 'classes' | 'instructors' | 'rooms' | 'students';
