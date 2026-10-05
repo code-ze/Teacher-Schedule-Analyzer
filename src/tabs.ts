@@ -1,5 +1,5 @@
 // Top-level sections of the app, shown as tabs once a timetable is loaded.
-export type TabId = 'overview' | 'classes' | 'availability' | 'meeting' | 'rooms' | 'report' | 'space' | 'students' | 'instructors';
+export type TabId = 'overview' | 'classes' | 'availability' | 'meeting' | 'rooms' | 'report' | 'space' | 'campus' | 'students' | 'instructors';
 
 export const TABS: { id: TabId; icon: string; label: string; description: string }[] = [
   { id: 'overview', icon: '📊', label: 'Overview', description: 'Key numbers for the loaded timetable' },
@@ -9,6 +9,7 @@ export const TABS: { id: TabId; icon: string; label: string; description: string
   { id: 'rooms', icon: '🏫', label: 'Rooms', description: 'Room occupancy by department, room and building' },
   { id: 'report', icon: '📑', label: 'Department Report', description: 'Room utilization report for one or more departments (PDF / Excel)' },
   { id: 'space', icon: '🏢', label: 'Space Report', description: 'Labs, classrooms, room needs and offices for Business, Design and Mass Comm (PDF)' },
+  { id: 'campus', icon: '🧭', label: 'Campus Plan', description: 'Consolidation figures for chosen departments: classrooms, labs, rooms, students and staff' },
   { id: 'students', icon: '🎓', label: 'Students', description: 'Student timetables, clashes, class sizes and when students are on campus' },
   { id: 'instructors', icon: '👩‍🏫', label: 'Instructors', description: 'Weekly schedule of every instructor' }
 ];

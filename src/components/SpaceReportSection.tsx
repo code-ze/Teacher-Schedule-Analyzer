@@ -22,13 +22,14 @@ interface Props {
   courses: Record<string, CourseSection>;
   departments: string[];
   timetableName?: string;
+  facilities: DepartmentFacilities[] | null;
+  facilitiesName: string;
+  onFacilities: (facilities: DepartmentFacilities[] | null, name: string) => void;
 }
 
 // South Campus space report: teaching space (labs / classrooms / online), the
 // compaction scenario and, from the facilities workbook, current offices and desks.
-export default function SpaceReportSection({ courses, departments, timetableName }: Props) {
-  const [facilities, setFacilities] = useState<DepartmentFacilities[] | null>(null);
-  const [facilitiesName, setFacilitiesName] = useState('');
+export default function SpaceReportSection({ courses, departments, timetableName, facilities, facilitiesName, onFacilities }: Props) {
   const [facilitiesError, setFacilitiesError] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [progress, setProgress] = useState('');
@@ -51,11 +52,10 @@ export default function SpaceReportSection({ courses, departments, timetableName
     try {
       const parsed = readFacilitiesWorkbook(new Uint8Array(await file.arrayBuffer()));
       if (parsed.length === 0) throw new Error('No department sheets were found in this workbook.');
-      setFacilities(parsed);
-      setFacilitiesName(file.name);
+      onFacilities(parsed, file.name);
       setFacilitiesError(null);
     } catch (err) {
-      setFacilities(null);
+      onFacilities(null, '');
       setFacilitiesError(err instanceof Error ? err.message : String(err));
     }
   };
@@ -191,8 +191,7 @@ export default function SpaceReportSection({ courses, departments, timetableName
               <button
                 className="btn-link"
                 onClick={() => {
-                  setFacilities(null);
-                  setFacilitiesName('');
+                  onFacilities(null, '');
                 }}
               >
                 Remove workbook

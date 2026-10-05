@@ -955,3 +955,41 @@ select { cursor: pointer; padding-right: 8px; }
 .heat-table tbody th { text-align: right; white-space: nowrap; }
 .heat-table td { text-align: center; padding: 8px 2px; border-radius: 4px; background: var(--surface-2); min-width: 44px; font-variant-numeric: tabular-nums; }
 .row-flag td { background: var(--amber-soft); }
+
+/* ── Campus plan ── */
+.cp-callout { background: var(--amber-soft); border: 1px solid var(--amber-line); color: var(--text); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 14px; font-size: 0.93em; }
+.cp-bar { height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; min-width: 40px; }
+.cp-bar-fill { height: 100%; border-radius: 999px; }
+.cp-accent { background: var(--accent); }
+.cp-green { background: var(--green); }
+.cp-muted { background: var(--border-strong); }
+.cp-red { background: var(--red); }
+.cp-legend { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82em; color: var(--muted); flex-wrap: wrap; }
+.cp-dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-left: 6px; }
+.cp-row { display: grid; grid-template-columns: minmax(110px, 190px) 1fr auto; align-items: center; gap: 10px; margin: 8px 0; font-size: 0.9em; }
+.cp-row-label { font-weight: 600; }
+.cp-row-value { white-space: nowrap; color: var(--text-2); }
+.cp-stack { display: flex; height: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.cp-pair { display: grid; gap: 4px; }
+.cp-pair .cp-bar { height: 10px; }
+.cp-chart { margin-top: 14px; }
+.cp-day { min-width: 90px; }
+.cp-day .cp-bar { margin: 3px 0; }
+.cp-day .muted { font-size: 0.78em; }
+.cp-total td { font-weight: 700; background: var(--surface-2); }
+.cp-sub td { color: var(--muted); }
+.cp-group-start td { border-top: 2px solid var(--border-strong); }
+.cp-dept-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.cp-dept { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; }
+.cp-dept-title { font-weight: 700; margin-bottom: 8px; }
+.cp-room { display: grid; grid-template-columns: 92px 1fr 92px; align-items: center; gap: 8px; font-size: 0.86em; margin: 4px 0; }
+.cp-room-name { font-weight: 600; display: inline-flex; gap: 4px; align-items: center; }
+.cp-room-name .tag { font-size: 0.75em; padding: 0 5px; }
+.cp-room-value { text-align: right; color: var(--text-2); white-space: nowrap; }
+.cp-details { border-top: 1px solid var(--border); padding: 8px 0; }
+.cp-details summary { cursor: pointer; font-weight: 600; font-size: 0.92em; }
+.cp-details[open] summary { margin-bottom: 8px; }
+@media (max-width: 600px) {
+  .cp-row { grid-template-columns: 1fr; gap: 4px; }
+  .cp-row-value { white-space: normal; }
+}
