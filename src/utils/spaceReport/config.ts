@@ -29,7 +29,7 @@ export const SPACE_REPORT_CONFIG: SpaceReportConfig = {
   departments: ['Business Studies', 'Design', 'Mass Communication'],
   labs: {
     'Business Studies': ['CR203', 'CR204', 'CR206'],
-    Design: ['AB213', 'AB214', 'AY212', 'CT207', 'CT208'],
+    Design: ['AB213', 'AB214', 'AY212', 'CT207', 'CT208', 'HL101'],
     'Mass Communication': ['AB213', 'AB214', 'AP114', 'AP115', 'CT207']
   },
   unlistedLabs: { 'Business Studies': 1 },
