@@ -73,8 +73,21 @@ function TeacherCard({ teacher }: { teacher: Teacher }) {
   );
 }
 
-export default function TeacherSchedules({ teachers }: { teachers: Record<string, Teacher> }) {
-  const [search, setSearch] = useState('');
+interface Props {
+  teachers: Record<string, Teacher>;
+  /** Search text from a shared search box; hides this panel's own box. */
+  query?: string;
+}
+
+/** Instructors whose name contains the search text. */
+export function searchTeachers(teachers: Teacher[], query: string): Teacher[] {
+  const q = query.trim().toLowerCase();
+  return q ? teachers.filter((t) => t.name.toLowerCase().includes(q)) : teachers;
+}
+
+export default function TeacherSchedules({ teachers, query }: Props) {
+  const [ownSearch, setSearch] = useState('');
+  const search = query ?? ownSearch;
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [limit, setLimit] = useState(PAGE_SIZE);
 
@@ -88,18 +101,14 @@ export default function TeacherSchedules({ teachers }: { teachers: Record<string
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [sorted]);
 
-  const filtered = sorted.filter((t) => {
-    if (deptFilter !== 'ALL' && t.department !== deptFilter) return false;
-    if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = searchTeachers(sorted, search).filter((t) => deptFilter === 'ALL' || t.department === deptFilter);
 
   return (
     <section className="panel" id="teacherSchedules">
       <div className="panel-header">
         <div>
           <h2>Instructors</h2>
-          <p className="panel-sub">Click an instructor to see their week.</p>
+          <p className="panel-sub">Click an instructor to see their week. Download the shown instructors' timetables as PDF or Excel.</p>
         </div>
         <div className="panel-actions">
           <button className="export-pdf-btn" onClick={() => exportTeachersPDF(filtered)}>
@@ -112,6 +121,7 @@ export default function TeacherSchedules({ teachers }: { teachers: Record<string
       </div>
 
       <div className="toolbar">
+        {query === undefined && (
         <input
           id="teacherSearch"
           type="search"
@@ -124,6 +134,7 @@ export default function TeacherSchedules({ teachers }: { teachers: Record<string
             setLimit(PAGE_SIZE);
           }}
         />
+        )}
         {departments.length > 0 && (
           <select
             aria-label="Department"

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { WORK_DAYS } from '../config';
 import type { CourseSection } from '../types';
 
@@ -9,15 +9,36 @@ interface Props {
   departments: string[];
   /** Students registered per section ("CODE-section"), when student data is loaded. */
   sectionSizes?: Map<string, number>;
+  /** Search text from a shared search box; hides this panel's own box. */
+  query?: string;
+}
+
+/** Sections matching a search: an exact phrase first, otherwise every word. */
+export function searchSections(sections: CourseSection[], query: string): CourseSection[] {
+  const phrase = query.trim().toLowerCase().replace(/\s+/g, ' ');
+  const terms = phrase.split(/[,\s]+/).filter(Boolean);
+  if (terms.length === 0) return [];
+  const candidates = sections.map((s) => {
+    const meetings = WORK_DAYS.flatMap((d) => s.schedule[d] || []);
+    const text = [s.code, s.name, `${s.code}-${s.section}`, s.department || '', ...meetings.flatMap((m) => [m.room, m.teacher])]
+      .join(' | ')
+      .toLowerCase();
+    return { s, text };
+  });
+  const exact = candidates.filter((c) => c.text.includes(phrase));
+  const matches = exact.length > 0 ? exact : candidates.filter((c) => terms.every((t) => c.text.includes(t)));
+  return matches.map((c) => c.s);
 }
 
 // Find where and when a class meets: search by course code, course name,
 // instructor or room and list every matching section with its meetings.
-export default function CourseSearch({ courses, departments, sectionSizes }: Props) {
-  const [query, setQuery] = useState('');
+export default function CourseSearch({ courses, departments, sectionSizes, query: sharedQuery }: Props) {
+  const [ownQuery, setQuery] = useState('');
+  const query = sharedQuery ?? ownQuery;
   const [dept, setDept] = useState('ALL');
   const [day, setDay] = useState('ALL');
   const [limit, setLimit] = useState(PAGE_SIZE);
+  useEffect(() => setLimit(PAGE_SIZE), [sharedQuery]);
 
   const sections = useMemo(
     () =>
@@ -29,25 +50,16 @@ export default function CourseSearch({ courses, departments, sectionSizes }: Pro
 
   const hasQuery = query.trim().length > 0;
 
-  const results = useMemo(() => {
-    const phrase = query.trim().toLowerCase().replace(/\s+/g, ' ');
-    const terms = phrase.split(/[,\s]+/).filter(Boolean);
-    if (terms.length === 0) return [];
-    const candidates = sections
-      .filter((s) => dept === 'ALL' || s.department === dept)
-      .filter((s) => day === 'ALL' || (s.schedule[day as (typeof WORK_DAYS)[number]] || []).length > 0)
-      .map((s) => {
-        const meetings = WORK_DAYS.flatMap((d) => s.schedule[d] || []);
-        const text = [s.code, s.name, `${s.code}-${s.section}`, s.department || '', ...meetings.flatMap((m) => [m.room, m.teacher])]
-          .join(' | ')
-          .toLowerCase();
-        return { s, text };
-      });
-    // Prefer an exact phrase (e.g. a full instructor name); otherwise every word must match.
-    const exact = candidates.filter((c) => c.text.includes(phrase));
-    const matches = exact.length > 0 ? exact : candidates.filter((c) => terms.every((t) => c.text.includes(t)));
-    return matches.map((c) => c.s);
-  }, [sections, query, dept, day]);
+  const results = useMemo(
+    () =>
+      searchSections(
+        sections
+          .filter((s) => dept === 'ALL' || s.department === dept)
+          .filter((s) => day === 'ALL' || (s.schedule[day as (typeof WORK_DAYS)[number]] || []).length > 0),
+        query
+      ),
+    [sections, query, dept, day]
+  );
 
   const visible = results.slice(0, limit);
 
@@ -64,6 +76,7 @@ export default function CourseSearch({ courses, departments, sectionSizes }: Pro
       </div>
 
       <div className="toolbar">
+        {sharedQuery === undefined && (
         <input
           type="search"
           className="grow"
@@ -75,6 +88,7 @@ export default function CourseSearch({ courses, departments, sectionSizes }: Pro
             setLimit(PAGE_SIZE);
           }}
         />
+        )}
         <select aria-label="Department" value={dept} onChange={(e) => setDept(e.target.value)}>
           <option value="ALL">All departments</option>
           {departments.map((d) => (
@@ -99,7 +113,7 @@ export default function CourseSearch({ courses, departments, sectionSizes }: Pro
       </div>
 
       {!hasQuery ? (
-        <div className="empty-state">Start typing to find a class.</div>
+        <div className="empty-state">Type a course code, course name, instructor or room to find a class.</div>
       ) : results.length === 0 ? (
         <div className="empty-state">No classes match “{query}”.</div>
       ) : (
