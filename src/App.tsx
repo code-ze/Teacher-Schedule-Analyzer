@@ -10,6 +10,7 @@ import DepartmentReportSection from './components/DepartmentReportSection';
 import SpaceReportSection from './components/SpaceReportSection';
 import CampusPlanSection from './components/CampusPlanSection';
 import StudentsSection from './components/StudentsSection';
+import ProposalCheckSection from './components/ProposalCheckSection';
 import VirtualRoomsPanel from './components/VirtualRoomsPanel';
 import AssignedRoomsPanel from './components/AssignedRoomsPanel';
 import { buildStudentIndex } from './utils/students/students';
@@ -268,6 +269,18 @@ export default function App() {
                 onOpenTab={(t) =>
                   t === 'space' ? openDepartments('space') : t === 'rooms' ? openSearch('', 'rooms') : openTab(t)
                 }
+              />
+            </div>
+
+            {/* Temporary: remove after the proposal review. */}
+            <div hidden={tab !== 'check'}>
+              <ProposalCheckSection
+                courses={data.courses}
+                virtualRooms={virtualRooms}
+                students={students}
+                facilities={facilities.data}
+                onOpenStudents={() => openTab('students')}
+                onOpenSpace={() => openDepartments('space')}
               />
             </div>
 

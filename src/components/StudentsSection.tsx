@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import SubNav from './SubNav';
 import * as XLSX from 'xlsx';
 import { WORK_DAYS } from '../config';
@@ -168,12 +168,29 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [sizeDept, setSizeDept] = useState('ALL');
+  const [sizeQuery, setSizeQuery] = useState('');
+  const [sizeFilter, setSizeFilter] = useState<'ALL' | 'SMALL' | 'EMPTY'>('ALL');
+  const [sizeLimit, setSizeLimit] = useState(100);
+  const [openSection, setOpenSection] = useState<string | null>(null);
   const [heatDept, setHeatDept] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [statusDept, setStatusDept] = useState('ALL');
   const [statusQuery, setStatusQuery] = useState('');
 
   const index = useMemo(() => (students ? buildStudentIndex(students, courses) : null), [students, courses]);
+  // Students in each section, for the class-size details.
+  const sectionStudents = useMemo(() => {
+    const m = new Map<string, StudentProfile[]>();
+    index?.profiles.forEach((p) =>
+      new Set(p.meetings.map((x) => x.sectionKey)).forEach((k) => {
+        const list = m.get(k);
+        if (list) list.push(p);
+        else m.set(k, [p]);
+      })
+    );
+    m.forEach((list) => list.sort((a, b) => a.name.localeCompare(b.name)));
+    return m;
+  }, [index]);
   useEffect(() => {
     if (!focus) return;
     setView('find');
@@ -238,7 +255,16 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
   const sizeRows = Object.values(courses)
     .filter((c) => sizeDept === 'ALL' || c.department === sizeDept)
     .map((c) => ({ c, size: index.sectionSizes.get(c.key) ?? 0 }));
-  const largest = [...sizeRows].sort((a, b) => b.size - a.size).slice(0, 15);
+  const sizeTerms = sizeQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const sizeShown = sizeRows
+    .filter(({ size }) => (sizeFilter === 'SMALL' ? size > 0 && size <= 5 : sizeFilter === 'EMPTY' ? size === 0 : true))
+    .filter(({ c }) => {
+      if (!sizeTerms.length) return true;
+      const r = sectionRow(c);
+      const text = `${c.key} ${c.name} ${r.rooms} ${r.teacher}`.toLowerCase();
+      return sizeTerms.every((t) => text.includes(t));
+    })
+    .sort((a, b) => b.size - a.size || a.c.key.localeCompare(b.c.key));
   const small = sizeRows.filter((r) => r.size > 0 && r.size <= 5).sort((a, b) => a.size - b.size);
   const empty = sizeRows.filter((r) => r.size === 0);
   const timetableDepts = Array.from(new Set(Object.values(courses).map((c) => c.department).filter(Boolean) as string[])).sort();
@@ -644,64 +670,133 @@ export default function StudentsSection({ students, fileName, courses, onFiles, 
             </select>
           </div>
         </div>
-        <div className="size-grid">
-          <div>
-            <h3 className="overview-heading">Largest sections</h3>
-            <div className="table-scroll">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Section</th>
-                    <th>Students</th>
-                    <th>Days &amp; times</th>
-                    <th>Room</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {largest.map(({ c, size }) => (
-                    <tr key={c.key}>
-                      <td className="strong" title={c.name}>
-                        {c.key}
-                      </td>
-                      <td>{size}</td>
-                      <td>{sectionRow(c).days}</td>
-                      <td>{sectionRow(c).rooms}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="toolbar">
+          <input
+            type="search"
+            className="grow"
+            aria-label="Filter sections"
+            placeholder="🔍 Course code, name, instructor or room…"
+            value={sizeQuery}
+            onChange={(e) => setSizeQuery(e.target.value)}
+          />
+          <div className="seg">
+            {(
+              [
+                ['ALL', `All ${sizeRows.length}`],
+                ['SMALL', `5 or fewer ${small.length}`],
+                ['EMPTY', `Empty ${empty.length}`]
+              ] as const
+            ).map(([id, label]) => (
+              <button key={id} className={`seg-btn${sizeFilter === id ? ' active' : ''}`} onClick={() => setSizeFilter(id)}>
+                {label}
+              </button>
+            ))}
           </div>
-          <div>
-            <h3 className="overview-heading">
-              Small (5 or fewer) and empty sections <span className="count-pill">{small.length + empty.length}</span>
-            </h3>
-            <div className="table-scroll" style={{ maxHeight: 420, overflowY: 'auto' }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Section</th>
-                    <th>Students</th>
-                    <th>Instructor</th>
-                    <th>Room</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...empty, ...small].map(({ c, size }) => (
-                    <tr key={c.key}>
-                      <td className="strong" title={c.name}>
-                        {c.key}
-                      </td>
-                      <td>{size || 'none'}</td>
-                      <td>{c.teacher}</td>
-                      <td>{sectionRow(c).rooms}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <span className="muted">{sizeShown.length} sections · click one to see its students</span>
         </div>
+        <div className="table-scroll">
+          <table className="data-table size-table">
+            <thead>
+              <tr>
+                <th>Section</th>
+                <th>Course name</th>
+                <th>Students</th>
+                <th>Days &amp; times</th>
+                <th>Room</th>
+                <th>Instructor</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sizeShown.slice(0, sizeLimit).map(({ c, size }) => {
+                const row = sectionRow(c);
+                const open = openSection === c.key;
+                const list = open ? sectionStudents.get(c.key) ?? [] : [];
+                return (
+                  <Fragment key={c.key}>
+                    <tr
+                      className={`size-row${open ? ' open' : ''}${size <= 5 ? ' row-flag' : ''}`}
+                      onClick={() => setOpenSection(open ? null : c.key)}
+                      aria-expanded={open}
+                    >
+                      <td className="strong">
+                        <span className="chevron-sm" aria-hidden>
+                          {open ? '▾' : '▸'}
+                        </span>{' '}
+                        {c.key}
+                      </td>
+                      <td>{c.name.replace(c.code, '').trim() || c.name}</td>
+                      <td className="strong">{size || 'none'}</td>
+                      <td>{row.days}</td>
+                      <td>{row.rooms}</td>
+                      <td>{row.teacher}</td>
+                    </tr>
+                    {open && (
+                      <tr className="size-detail">
+                        <td colSpan={6}>
+                          {list.length === 0 ? (
+                            <span className="muted">No students are registered in this section.</span>
+                          ) : (
+                            <>
+                              <div className="size-detail-head">
+                                <strong>{list.length} students</strong>
+                                <span className="muted">
+                                  {countBy(list, (p) => p.department)
+                                    .map(([k, v]) => `${k} ${v.length}`)
+                                    .join(' · ')}
+                                </span>
+                              </div>
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Level</th>
+                                    <th>Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {list.map((p) => (
+                                    <tr key={p.id}>
+                                      <td>
+                                        <button
+                                          className="btn-link"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setQuery(p.id);
+                                            setSelected(p.id);
+                                            setView('find');
+                                          }}
+                                        >
+                                          {p.id}
+                                        </button>
+                                      </td>
+                                      <td>{p.name}</td>
+                                      <td>{p.department}</td>
+                                      <td>{p.level}</td>
+                                      <td>{p.status}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {sizeShown.length > sizeLimit && (
+          <div className="show-more">
+            <button className="btn-outline" onClick={() => setSizeLimit((l) => l + 100)}>
+              Show more ({sizeShown.length - sizeLimit} more)
+            </button>
+          </div>
+        )}
         {index.unmatched.length > 0 && (
           <p className="department-report-note" style={{ marginTop: 10 }}>
             {fmt(index.unmatched.reduce((s, u) => s + u.count, 0))} registrations are for courses or sections not in the
