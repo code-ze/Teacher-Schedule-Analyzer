@@ -9,6 +9,8 @@ import DepartmentReportSection from './components/DepartmentReportSection';
 import TeacherSchedules from './components/TeacherSchedules';
 import SpaceReportSection from './components/SpaceReportSection';
 import StudentsSection from './components/StudentsSection';
+import CampusPlanSection from './components/CampusPlanSection';
+import type { DepartmentFacilities } from './utils/spaceReport/facilities';
 import { buildStudentIndex } from './utils/students/students';
 import VirtualRoomsPanel from './components/VirtualRoomsPanel';
 import { loadVirtualRooms, saveVirtualRooms } from './utils/virtualRooms';
@@ -23,6 +25,7 @@ export default function App() {
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>('overview');
   const [virtualRooms, setVirtualRooms] = useState<string[]>(loadVirtualRooms);
+  const [facilities, setFacilities] = useState<{ data: DepartmentFacilities[] | null; name: string }>({ data: null, name: '' });
   const [assignedRooms, setAssignedRooms] = useState<AssignedRoom[]>(loadAssignedRooms);
   const updateAssignedRooms = (rooms: AssignedRoom[]) => {
     setAssignedRooms(rooms);
@@ -158,7 +161,24 @@ export default function App() {
               />
             </div>
             <div hidden={tab !== 'space'}>
-              <SpaceReportSection courses={data.courses} departments={data.departments} timetableName={fileNames.join(', ')} />
+              <SpaceReportSection
+                courses={data.courses}
+                departments={data.departments}
+                timetableName={fileNames.join(', ')}
+                facilities={facilities.data}
+                facilitiesName={facilities.name}
+                onFacilities={(f, name) => setFacilities({ data: f, name })}
+              />
+            </div>
+            <div hidden={tab !== 'campus'}>
+              <CampusPlanSection
+                courses={data.courses}
+                departments={data.departments}
+                virtualRooms={virtualRooms}
+                students={students}
+                facilities={facilities.data}
+                onOpenTab={openTab}
+              />
             </div>
             <div hidden={tab !== 'students'}>
               <StudentsSection
